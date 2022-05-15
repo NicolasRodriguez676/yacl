@@ -1,0 +1,64 @@
+buffer MAX 128
+wdx = one byte
+rdx = one byte
+
+empty buffer			wdx = pos[0]; rdx = pos[0];
+buffer has cmd			wdx = pos[24]; rdx = pos[0];
+buffer has been read	wdx = pos[24]; rdx = pos[24];
+
+buffer overrun			wdx = neg[24]; rdx = pos[24];
+
+if wdx and rdx are MAX 128 bytes, then wdx over takes rdx when they are equal but different signs
+
+
+read index 	-- (^)
+write index -- {^}
+
+		cmd arg1 arg2 [\n]
+       (^)                {^}
+		
+		argv[0] = pointer[cmd]		delimiter == space
+		argv[1] = pointer[arg1]		delimiter == space
+		argv[2] = pointer[arg2]		delimiter == newline
+		
+		cmd [\0] arg1 [\0] arg2 [\0]
+		                         (^){^}
+		
+        [1 ][2  ][3      ]
+		cmd arg1 arg2 [\n] [\n] cmd arg1 arg2 [\n]
+       (^)                                        {^}
+	   
+	   
+	    cmd arg1 arg2 [\n] [\n] cmd arg1 arg2 [\n]
+	   (^)                                  {^}
+	   
+	    cmd [\0] arg1 [\0] arg2 [\0] [\n] cmd arg1 arg2 [\n]
+		                              (^)                   {^}
+	
+		cmd [\0] arg1 [\0] arg2 [\0] [\0] cmd arg1 arg2 [\n]									  
+									     (^)                {^}
+
+		cmd [\0] arg1 [\0] arg2 [\0] [\0] cmd [\0] arg1 [\0] arg2 [\0]
+									                               (^){^}									  
+									  
+									  
+									  
+									  
+									  
+									  
+									  
+									  
+									  
+									  
+									  
+									  
+									  
+									  
+									  
+									  
+									  
+									  
+									  
+									  
+									  
+									  
