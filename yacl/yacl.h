@@ -1,7 +1,3 @@
-//
-// Created by darer on 5/4/2022.
-//
-
 #ifndef _YACL_H_
 #define _YACL_H_
 

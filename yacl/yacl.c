@@ -3,6 +3,7 @@
 //
 
 #include <string.h>
+#include <stdio.h>
 
 #include "yacl.h"
 
@@ -14,24 +15,16 @@ typedef struct _error_desc {
 
 } error_desc_t;
 
-typedef struct _cmd_buf {
-	char* bufr;
-
-	uint8_t rdx;
-	uint8_t wdx;
-
-} yacl_cmd_buf_t;
-
 //      GLOBALS
-
-static const char _delim_space[] = " ";
-static const char _cmd_entered_char[] = "\n";
 
 static yacl_cmd_cb_t* _usr_cmd;
 static uint32_t _usr_cmd_size;
 
-static yacl_cmd_buf_t _cmd_buf;
-static uint32_t _buf_status;
+static char _cmd_bufr[YACL_CMD_LEN_MAX];
+static uint8_t _bwx = 0;
+static uint8_t _brx = 0;
+
+static uint32_t _buf_status = YACL_PARSE_NOT_RDY;
 
 //      FUNCTION PROTOTYPES
 
@@ -41,16 +34,8 @@ static yacl_error_t _buf_chk();
 
 void yacl_init(yacl_cmd_cb_t* usr_cmd, uint32_t usr_cmd_size)
 {
-	static char cmd_buf[YACL_CMD_LEN_MAX];
-
-	_cmd_buf.bufr = cmd_buf;
-	_cmd_buf.rdx = 0;
-	_cmd_buf.wdx = 0;
-
 	_usr_cmd = usr_cmd;
 	_usr_cmd_size = usr_cmd_size;
-
-	_buf_status = YACL_PARSE_NOT_RDY;
 }
 
 yacl_error_t yacl_wr_buf(char data)
@@ -60,62 +45,109 @@ yacl_error_t yacl_wr_buf(char data)
 	if (error != YACL_SUCCESS)
 		return error;
 
-	if (data == _cmd_entered_char[0])
-		_buf_status = YACL_PARSE_RDY;
-
-	_cmd_buf.bufr[_cmd_buf.wdx & 0x7f] = data;
-	++(_cmd_buf.wdx);
+	_cmd_bufr[_bwx & 0x7f] = data;
+	++_bwx;
 
 	return YACL_SUCCESS;
+}
+
+enum
+{
+	NO_CB = -1,
+
+	DELIM_SPACE = 32,
+	DELIM_NEWLINE = 10
+};
+
+void save_token(uint8_t* argc, char** argv, uint8_t* token_begin)
+{
+	printf("TOKEN -- R%d  B%d  A%d\n", _brx, *token_begin, *argc);
+
+	_cmd_bufr[_brx & 0x7f] = '\0';
+	argv[(*argc)++] = _cmd_bufr + *token_begin;      // is argc out of bounds?
+
+	*token_begin = (_brx + 1) & 0x7f;
+}
+
+int32_t _get_argv_cb(char** argv)
+{
+	for (uint32_t i = 0; i < _usr_cmd_size; ++i)
+	{
+		if (strcmp(argv[0], _usr_cmd[i].usr_cmd) == 0)
+			return i;
+	}
+
+	return NO_CB;
 }
 
 yacl_error_t yacl_parse_cmd()
 {
-	if (_buf_status != YACL_PARSE_RDY)
-		return YACL_NO_CMD;
+	static uint8_t argc = 0;
+	static char* argv[YACL_MAX_ARGS];
 
-	_buf_status = YACL_PARSE_NOT_RDY;
+	// need a way to remember original begin, if incomplete message is sent
+	static uint8_t token_begin = 0;
+	int32_t argv_cb;
 
-	char* token = strtok(_cmd_buf.bufr, _delim_space);
-	char* argv[YACL_MAX_ARGS + 1];
-
-	argv[0] = token;
-	_cmd_buf.rdx += strlen(token + 1);
-
-	uint32_t usr_cmd_idx = 0;
-
-	while (strcmp(argv[0], _usr_cmd[usr_cmd_idx].usr_cmd) != 0)
+	printf("PARSE -- R%d  W%d\n", _brx, _bwx);
+	while(1)
 	{
-		++usr_cmd_idx;
+//		printf("YACL -- R%d  bufr[%c]\n", _brx, _cmd_bufr[_brx & 0x7f]);
 
-		if (usr_cmd_idx == _usr_cmd_size)
-			return YACL_UNKNOWN_CMD;
-	}
+		switch (_cmd_bufr[_brx & 0x7f])
+		{
+		case DELIM_SPACE:
+			if (_cmd_bufr[(_brx - 1) & 0x7f] == '\0')
+			{
+				_cmd_bufr[_brx & 0x7f] = '\0';
+				++token_begin;
 
-	uint32_t argc = 1;
+				break;
+			}
 
-	while (1)
-	{
-		token = strtok(NULL, _delim_space);
-
-		if (token == NULL)
+			save_token(&argc, argv, &token_begin);
 			break;
 
-		_cmd_buf.rdx += strlen(token) + 1;
+		case DELIM_NEWLINE:
 
-		argv[argc] = token;
-		++argc;
+			if (_cmd_bufr[(_brx - 1) & 0x7f] == '\0')
+			{
+				printf("NULL -- R%d  bufr[%u]\n", _brx - 1, _cmd_bufr[(_brx - 1) & 0x7f]);
+
+				_cmd_bufr[_brx & 0x7f] = '\0';
+				++token_begin;
+
+				break;
+			}
+
+
+			save_token(&argc, argv, &token_begin);
+			printf("NEWLINE -- R%d  bufr[%u]\n", _brx, _cmd_bufr[_brx & 0x7f]);
+
+			argv_cb = _get_argv_cb(argv);
+
+			if (argv_cb == NO_CB)
+				return YACL_UNKNOWN_CMD;
+			else
+			{
+				_usr_cmd[argv_cb].usr_cmd_cb(argc, argv);
+				argc = 0;
+
+				return YACL_SUCCESS;
+			}
+		}
+
+		if (_brx == (_bwx - 1))
+			return YACL_SUCCESS;
+		else
+			++_brx;
 	}
-
-	_usr_cmd[usr_cmd_idx].usr_cmd_cb(argc, argv);
-
-	return YACL_SUCCESS;
 }
 
 void yacl_empty_buf()
 {
-	_cmd_buf.rdx = 0;
-	_cmd_buf.wdx = 0;
+	_brx = 0;
+	_bwx = 0;
 }
 
 const char* yacl_error_desc(yacl_error_t error)
@@ -137,11 +169,10 @@ const char* yacl_error_desc(yacl_error_t error)
 
 static yacl_error_t _buf_chk()
 {
-	if ((_cmd_buf.wdx & 0x80) == (_cmd_buf.rdx & 0x80))
+	if ((_bwx & 0x80) == (_brx & 0x80))
 		return YACL_SUCCESS;
-	else
-		if ((_cmd_buf.wdx | 0x80) == (_cmd_buf.rdx | 0x80))
-			return YACL_BUF_FULL;
+	else if ((_bwx | 0x80) == (_brx | 0x80))
+		return YACL_BUF_FULL;
 
 	return YACL_SUCCESS;
 }
