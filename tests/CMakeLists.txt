@@ -1,3 +1,4 @@
 enable_testing()
 
-add_subdirectory(yacl)
+add_subdirectory(basic)
+add_subdirectory(token)
