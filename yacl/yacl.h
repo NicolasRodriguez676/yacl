@@ -3,31 +3,15 @@
 
 #include <stdint.h>
 
-/*
- *  cmd         - full command typed and passed to parser
- *  user cmd    - single word command that is associated with a user defined callback
- *  args        - arguments or options for given user cmd
- *
- *  newline     - if cmd string contains newline, signal cmd to be parsed
-*/
-
-//      GLOBALS
-
 
 //      TYPES
 
-enum {
-	YACL_CMD_LEN_MAX        = 128,
-	YACL_MAX_ARGS           = 16,
-	YACL_PARSE_RDY          = 0,
-	YACL_PARSE_NOT_RDY      = 1,
-};
-
 typedef enum yacl_error {
 	YACL_SUCCESS = 0,
-	YACL_UNKNOWN_CMD = -1,
-	YACL_NO_CMD = -2,
-	YACL_BUF_FULL = -3,
+	YACL_UNKNOWN_CMD = 1,
+	YACL_NO_CMD = 2,
+	YACL_BUF_FULL = 3,
+	YACL_ARGS_FULL = 4,
 
 } yacl_error_t;
 
