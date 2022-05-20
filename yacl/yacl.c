@@ -35,12 +35,13 @@ static char _cmd_bufr[YACL_CMD_LEN_MAX];
 static uint8_t _brx = 0;
 static uint8_t _bwx = 0;
 
+static uint8_t _argc = 0;
 static uint8_t _argv_token_zero = 0;
 
 //      FUNCTION PROTOTYPES
 
 static yacl_error_t _buf_chk();
-static void _save_token(uint8_t argc, char** argv, uint8_t* token_begin);
+static void _save_token(char** argv, uint8_t* token_begin);
 static int32_t _get_argv_cb();
 
 //      PUBLIC      ****************************************************************************************************
@@ -63,7 +64,6 @@ yacl_error_t yacl_wr_buf(char data)
 
 yacl_error_t yacl_parse_cmd()
 {
-	static uint8_t argc = 0;
 	static char* argv[YACL_MAX_ARGS];
 
 	static uint8_t token_begin = 0;
@@ -82,25 +82,16 @@ yacl_error_t yacl_parse_cmd()
 				break;
 			}
 
-			_save_token(argc, argv, &token_begin);
-			++argc;
+			_save_token(argv, &token_begin);
+			++_argc;
 
-			if (argc == YACL_MAX_ARGS)
+			if (_argc > YACL_MAX_ARGS)
 				return YACL_ARGS_FULL;
 
 			break;
 
 		case DELIM_NEWLINE:
-			if (_cmd_bufr[(_brx - 1) & 0x7f] == '\0')
-			{
-				_cmd_bufr[_brx & 0x7f] = '\0';
-				++token_begin;
-
-				break;
-			}
-
-			_save_token(argc, argv, &token_begin);
-			++argc;
+			_save_token(argv, &token_begin);
 
 			argv_cb = _get_argv_cb();
 			_argv_token_zero = token_begin;
@@ -109,8 +100,8 @@ yacl_error_t yacl_parse_cmd()
 				return YACL_UNKNOWN_CMD;
 			else
 			{
-				_usr_cmd[argv_cb].usr_cmd_cb(argc, argv);
-				argc = 0;
+				_usr_cmd[argv_cb].usr_cmd_cb(_argc, argv);
+				_argc = 0;
 
 				return YACL_SUCCESS;
 			}
@@ -127,6 +118,8 @@ void yacl_empty_buf()
 {
 	_brx = 0;
 	_bwx = 0;
+
+	_argc = 0;
 }
 
 const char* yacl_error_desc(yacl_error_t error)
@@ -139,11 +132,7 @@ const char* yacl_error_desc(yacl_error_t error)
 		{ YACL_ARGS_FULL,       "args full"                                 }
 	};
 
-	if (error >= sizeof error_desc / sizeof (error_desc[0]))
-		return NULL;
-	else
-		return error_desc[error].msg;
-
+	return error_desc[error].msg;
 }
 
 //      PRIVATE     ****************************************************************************************************
@@ -173,10 +162,10 @@ static int32_t _get_argv_cb()
 	return NO_CB;
 }
 
-static void _save_token(uint8_t argc, char** argv, uint8_t* token_begin)
+static void _save_token(char** argv, uint8_t* token_begin)
 {
 	_cmd_bufr[_brx & 0x7f] = '\0';
-	argv[argc] = _cmd_bufr + *token_begin;
+	argv[_argc] = _cmd_bufr + *token_begin;
 
 	*token_begin = (_brx + 1) & 0x7f;
 }
