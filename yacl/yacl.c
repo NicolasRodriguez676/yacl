@@ -1,5 +1,6 @@
 #include <string.h>
 #include <stdio.h>
+#include <assert.h>
 
 #include "yacl.h"
 
@@ -10,13 +11,13 @@
 
 enum
 {
-	NO_CB = -1,
+	NO_CB               = -1,
 
-	DELIM_SPACE = 32,
-	DELIM_NEWLINE = 10,
+	DELIM_SPACE         = 32,
+	DELIM_NEWLINE       = 10,
 
-	YACL_CMD_LEN_MAX        = 128,
-	YACL_MAX_ARGS           = 12
+	YACL_CMD_LEN_MAX    = 128,
+	YACL_MAX_ARGS       = 12
 };
 
 typedef struct _error_desc {
@@ -34,12 +35,13 @@ static char _cmd_bufr[YACL_CMD_LEN_MAX];
 static uint8_t _brx = 0;
 static uint8_t _bwx = 0;
 
+static uint8_t _argv_token_zero = 0;
 
 //      FUNCTION PROTOTYPES
 
 static yacl_error_t _buf_chk();
 static void _save_token(uint8_t argc, char** argv, uint8_t* token_begin);
-static int32_t _get_argv_cb(char** argv);
+static int32_t _get_argv_cb();
 
 //      PUBLIC      ****************************************************************************************************
 
@@ -66,8 +68,6 @@ yacl_error_t yacl_parse_cmd()
 
 	static uint8_t token_begin = 0;
 	int32_t argv_cb;
-
-	LOG_DEBUG("R%d  W%d\n", _brx, _bwx);
 
 	while(1)
 	{
@@ -101,7 +101,9 @@ yacl_error_t yacl_parse_cmd()
 
 			_save_token(argc, argv, &token_begin);
 			++argc;
-			argv_cb = _get_argv_cb(argv);
+
+			argv_cb = _get_argv_cb();
+			_argv_token_zero = token_begin;
 
 			if (argv_cb == NO_CB)
 				return YACL_UNKNOWN_CMD;
@@ -114,8 +116,8 @@ yacl_error_t yacl_parse_cmd()
 			}
 		}
 
-		if ((_brx + 1) == _bwx)
-			return YACL_SUCCESS;
+		if (((_brx + 1) & 0x7f) == (_bwx & 0x7f))
+			return YACL_NO_CMD;
 		else
 			++_brx;
 	}
@@ -130,27 +132,42 @@ void yacl_empty_buf()
 const char* yacl_error_desc(yacl_error_t error)
 {
 	static const error_desc_t error_desc[] = {
-		{ YACL_SUCCESS, "command successfully executed" },
-		{ YACL_UNKNOWN_CMD, "command was not found in given commands" },
-		{ YACL_NO_CMD, "command incomplete" },
-		{ YACL_BUF_FULL, "buffer full. try emptying buffer" },
-		{ YACL_ARGS_FULL, "args full" }
+		{ YACL_SUCCESS,         "command successfully executed"             },
+		{ YACL_UNKNOWN_CMD,     "command was not found in given commands"   },
+		{ YACL_NO_CMD,          "command incomplete"                        },
+		{ YACL_BUF_FULL,        "buffer full. try emptying buffer"          },
+		{ YACL_ARGS_FULL,       "args full"                                 }
 	};
 
-	if (error >= 0)
-		return error_desc[error].msg;
-	else
+	if (error >= sizeof error_desc / sizeof (error_desc[0]))
 		return NULL;
+	else
+		return error_desc[error].msg;
+
 }
 
 //      PRIVATE     ****************************************************************************************************
 
-static int32_t _get_argv_cb(char** argv)
+static int32_t _get_argv_cb()
 {
-	for (uint32_t i = 0; i < _usr_cmd_size; ++i)
+	for(uint32_t i = 0; i < _usr_cmd_size; ++i)
 	{
-		if (strcmp(argv[0], _usr_cmd[i].usr_cmd) == 0)
-			return i;
+		char* str_cmd = _usr_cmd[i].usr_cmd;
+
+		while(1)
+		{
+			if (_cmd_bufr[_argv_token_zero] == *str_cmd)
+			{
+				if (_cmd_bufr[_argv_token_zero] == '\0')
+					return i;
+
+				++_argv_token_zero;
+				++str_cmd;
+			}
+			else
+				break;
+
+		}
 	}
 
 	return NO_CB;
