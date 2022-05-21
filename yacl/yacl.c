@@ -40,9 +40,9 @@ static uint8_t _argv_token_zero = 0;
 
 //      FUNCTION PROTOTYPES
 
-static yacl_error_t _buf_chk();
 static void _save_token(char** argv, uint8_t* token_begin);
 static int32_t _get_argv_cb();
+static yacl_error_t _buf_chk();
 
 //      PUBLIC      ****************************************************************************************************
 
@@ -65,8 +65,8 @@ yacl_error_t yacl_wr_buf(char data)
 yacl_error_t yacl_parse_cmd()
 {
 	static char* argv[YACL_MAX_ARGS];
-
 	static uint8_t token_begin = 0;
+
 	int32_t argv_cb;
 
 	while(1)
