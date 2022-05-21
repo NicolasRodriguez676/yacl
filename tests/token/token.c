@@ -11,6 +11,11 @@
 
 void my_callback(uint32_t argc, char** argv);
 
+void my_print_func(char data)
+{
+	putchar(data);
+}
+
 yacl_cmd_cb_t usr_cmd[] = {
 	{ "help", my_callback },
 	{ "read", my_callback },
@@ -32,7 +37,7 @@ int main(int argc, char** argv)
 	*(pbuffer) = '\0';
 
 	yacl_error_t error;
-	yacl_init(usr_cmd, sizeof(usr_cmd) / sizeof(usr_cmd[0]));
+	yacl_init(usr_cmd, sizeof(usr_cmd) / sizeof(usr_cmd[0]), my_print_func);
 
 	for (uint32_t i = 0; i < strlen(buffer); ++i)
 		yacl_wr_buf(buffer[i]);
