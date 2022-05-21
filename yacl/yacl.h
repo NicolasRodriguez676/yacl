@@ -23,7 +23,7 @@ typedef struct yacl_cmd_cb {
 
 //      FUNCTIONS
 
-void yacl_init(yacl_cmd_cb_t* usr_cmd, uint32_t usr_cmd_size);
+void yacl_init(yacl_cmd_cb_t* usr_cmd, uint32_t usr_cmd_size, void (* print_func)(char));
 void yacl_empty_buf();
 
 yacl_error_t yacl_parse_cmd();

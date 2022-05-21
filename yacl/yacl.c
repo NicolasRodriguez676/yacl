@@ -31,6 +31,8 @@ typedef struct _error_desc {
 static yacl_cmd_cb_t* _usr_cmd;
 static uint32_t _usr_cmd_size;
 
+static void (*_print_func)(char data);
+
 static char _cmd_bufr[YACL_CMD_LEN_MAX];
 static uint8_t _brx = 0;
 static uint8_t _bwx = 0;
@@ -46,10 +48,12 @@ static yacl_error_t _buf_chk();
 
 //      PUBLIC      ****************************************************************************************************
 
-void yacl_init(yacl_cmd_cb_t* usr_cmd, uint32_t usr_cmd_size)
+void yacl_init(yacl_cmd_cb_t* usr_cmd, uint32_t usr_cmd_size, void (* print_func)(char))
 {
 	_usr_cmd = usr_cmd;
 	_usr_cmd_size = usr_cmd_size;
+
+	_print_func = print_func;
 }
 
 yacl_error_t yacl_wr_buf(char data)
@@ -125,7 +129,7 @@ void yacl_empty_buf()
 const char* yacl_error_desc(yacl_error_t error)
 {
 	static const error_desc_t error_desc[] = {
-		{ YACL_SUCCESS,         "command successfully executed"             },
+		{ YACL_SUCCESS,         "no errors. good to go"                      },
 		{ YACL_UNKNOWN_CMD,     "command was not found in given commands"   },
 		{ YACL_NO_CMD,          "command incomplete"                        },
 		{ YACL_BUF_FULL,        "buffer full. try emptying buffer"          },
