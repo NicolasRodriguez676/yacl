@@ -6,7 +6,7 @@
 {                                                                                                               \
 	char str_line[16];                                                                                          \
 	sprintf(str_line, "%d", __LINE__);                                                                          \
-	printf("[%s, %d%s%*.*s -- ", __func__, __LINE__, "]", 15 - strlen(__func__) - strlen(str_line) + 4, 0, " ");\
+	printf("[%s, %d%s%*.*s -- ", __func__, __LINE__, "]", 15 - (int32_t)strlen(__func__) - (int32_t)strlen(str_line) + 4, 0, " ");\
 } while(0)
 
 #define LOG_DEBUG(...) LOG; printf(__VA_ARGS__)
