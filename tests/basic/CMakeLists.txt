@@ -10,3 +10,5 @@ add_test(NAME "YaclTest-HELP1" COMMAND "${YACL_TEST}" "help ")
 add_test(NAME "YaclTest-HELP2" COMMAND "${YACL_TEST}" "help arg1 arg2")
 add_test(NAME "YaclTest-READ" COMMAND "${YACL_TEST}" "read hello there")
 add_test(NAME "YaclTest-WRITE" COMMAND "${YACL_TEST}" "write hello there")
+
+target_compile_options(${YACL_TEST} PRIVATE -Wall)
