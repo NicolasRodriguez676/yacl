@@ -72,8 +72,11 @@ int main(int argc, char** argv)
 			yacl_wr_buf(cmd[i]);
 
 		error = yacl_parse_cmd();
+
+		if (error == YACL_ARGS_FULL)
+			yacl_empty_buf();
 	}
-	LOG_DEBUG("%s\n\n", yacl_error_desc(error));
+	LOG_DEBUG("%s\n", yacl_error_desc(error));
 
 	return error;
 }
