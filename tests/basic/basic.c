@@ -5,7 +5,7 @@
 #include "yacl.h"
 
 #define YACL_LOG
-#include "log.h"
+#include "../log.h"
 
 void my_callback(uint32_t argc, char** argv);
 
@@ -38,7 +38,10 @@ int main(int argc, char** argv)
 	yacl_init(usr_cmd, sizeof(usr_cmd) / sizeof(usr_cmd[0]), my_print_func);
 
 	for (uint32_t i = 0; i < strlen(buffer); ++i)
+	{
+		yacl_parse_cmd();
 		yacl_wr_buf(buffer[i]);
+	}
 
 	yacl_wr_buf('\n');
 	error = yacl_parse_cmd();

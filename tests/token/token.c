@@ -7,7 +7,7 @@
 #include "yacl.h"
 
 #define YACL_LOG
-#include "log.h"
+#include "..\log.h"
 
 void my_callback(uint32_t argc, char** argv);
 

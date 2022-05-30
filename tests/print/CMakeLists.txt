@@ -1,10 +1,10 @@
 set(YACL_TEST print)
 
-add_executable(${YACL_TEST} print.c)
+add_executable(${PROJECT_NAME}-${YACL_TEST} print.c)
 
-target_include_directories(${YACL_TEST} PRIVATE ${PROJECT_SOURCE_DIR}/yacl)
-target_link_libraries(${YACL_TEST} yacl)
+target_include_directories(${PROJECT_NAME}-${YACL_TEST} PRIVATE ${CMAKE_SOURCE_DIR}/yacl)
+target_link_libraries(${PROJECT_NAME}-${YACL_TEST} yacl)
 
-add_test(NAME "PRINT" COMMAND "${YACL_TEST}")
+add_test(NAME "PRINT" COMMAND "${PROJECT_NAME}-${YACL_TEST}")
 
-target_compile_options(${YACL_TEST} PRIVATE -Wall)
+target_compile_options(${PROJECT_NAME}-${YACL_TEST} PRIVATE -Wall -std=c11)

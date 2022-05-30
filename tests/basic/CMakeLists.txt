@@ -1,14 +1,14 @@
 set(YACL_TEST basic)
 
-add_executable(${YACL_TEST} basic.c)
+add_executable(${PROJECT_NAME}-${YACL_TEST} basic.c)
 
-target_include_directories(${YACL_TEST} PRIVATE ${PROJECT_SOURCE_DIR}/yacl)
-target_link_libraries(${YACL_TEST} yacl)
+target_include_directories(${PROJECT_NAME}-${YACL_TEST} PRIVATE ${CMAKE_SOURCE_DIR}/yacl)
+target_link_libraries(${PROJECT_NAME}-${YACL_TEST} yacl)
 
-add_test(NAME "YaclTest-HELP0" COMMAND "${YACL_TEST}" "help")
-add_test(NAME "YaclTest-HELP1" COMMAND "${YACL_TEST}" "help ")
-add_test(NAME "YaclTest-HELP2" COMMAND "${YACL_TEST}" "help arg1 arg2")
-add_test(NAME "YaclTest-READ" COMMAND "${YACL_TEST}" "read hello there")
-add_test(NAME "YaclTest-WRITE" COMMAND "${YACL_TEST}" "write hello there")
+add_test(NAME "HELP0" COMMAND  "${PROJECT_NAME}-${YACL_TEST}" "help")
+add_test(NAME "HELP1" COMMAND  "${PROJECT_NAME}-${YACL_TEST}" "help ")
+add_test(NAME "HELP2" COMMAND  "${PROJECT_NAME}-${YACL_TEST}" "help arg1 arg2")
+add_test(NAME "READ" COMMAND   "${PROJECT_NAME}-${YACL_TEST}" "read hello there")
+add_test(NAME "WRITE" COMMAND  "${PROJECT_NAME}-${YACL_TEST}" "write hello there")
 
-target_compile_options(${YACL_TEST} PRIVATE -Wall)
+target_compile_options(${PROJECT_NAME}-${YACL_TEST} PRIVATE -Wall -std=c11)

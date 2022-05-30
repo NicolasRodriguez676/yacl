@@ -1,13 +1,48 @@
 cmake_minimum_required(VERSION 3.22)
-project(yacl_r03 C)
 
-set(CMAKE_C_STANDARD 11)
+option(BUILD-EMBEDDED "build library using stm32 gcc toolchain" ON)
 
-#add_executable(yacl_r03 main.c)
+if (${BUILD-EMBEDDED})
+    set(CMAKE_TOOLCHAIN_FILE $ENV{CMAKE_STM32_SCRIPTS}/stm32_gcc.cmake)
+    set(CMAKE_INSTALL_PREFIX $ENV{EMBEDDED_LIBS})
+endif()
 
-#target_include_directories(yacl_r03 PRIVATE yacl)
+project(YACL C ASM)
 
-add_subdirectory(yacl)
-add_subdirectory(tests)
+add_library(yacl STATIC)
+target_sources(yacl PRIVATE yacl/yacl.c yacl/yacl.h)
 
-#target_link_libraries(yacl_r03 yacl)
+if (${BUILD-EMBEDDED})
+    target_compile_options(yacl
+            PUBLIC
+                -mcpu=cortex-m4
+                -mfpu=fpv4-sp-d16
+                -mfloat-abi=hard
+                -Wall
+            PRIVATE
+                -std=c11
+            )
+
+    install(
+            TARGETS
+                yacl
+            DESTINATION
+                ${PROJECT_NAME}/${CMAKE_BUILD_TYPE}/lib
+    )
+
+    install(
+            FILES
+                yacl/yacl.h
+            DESTINATION
+                ${PROJECT_NAME}/${CMAKE_BUILD_TYPE}/include
+    )
+
+else()
+    target_compile_options(yacl
+            PUBLIC
+                -Wall
+                -std=c11
+            )
+
+    add_subdirectory(tests)
+endif()

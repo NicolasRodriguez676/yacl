@@ -1,11 +1,4 @@
-#include <string.h>
-#include <stdio.h>
-#include <assert.h>
-
 #include "yacl.h"
-
-#define YACL_LOG
-#include "log.h"
 
 //      TYPES
 
