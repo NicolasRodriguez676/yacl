@@ -9,11 +9,11 @@ endif()
 
 project(YACL C ASM)
 
-add_library(yacl STATIC)
-target_sources(yacl PRIVATE yacl/yacl.c yacl/yacl.h)
+add_library(${PROJECT_NAME} STATIC)
+target_sources(${PROJECT_NAME} PRIVATE yacl/yacl.c yacl/yacl.h)
 
 if (${BUILD-EMBEDDED})
-    target_compile_options(yacl
+    target_compile_options(${PROJECT_NAME}
             PUBLIC
                 -mcpu=cortex-m4
                 -mfpu=fpv4-sp-d16
@@ -25,20 +25,40 @@ if (${BUILD-EMBEDDED})
 
     install(
             TARGETS
-                yacl
+                ${PROJECT_NAME}
+            EXPORT
+                ${PROJECT_NAME}
             DESTINATION
-                ${PROJECT_NAME}/${CMAKE_BUILD_TYPE}/lib
+                lib/${PROJECT_NAME}/${CMAKE_BUILD_TYPE}
+    )
+
+    install(
+            EXPORT
+                ${PROJECT_NAME}
+            NAMESPACE
+                ${PROJECT_NAME}::
+            DESTINATION
+                lib/${PROJECT_NAME}/${CMAKE_BUILD_TYPE}
     )
 
     install(
             FILES
                 yacl/yacl.h
             DESTINATION
-                ${PROJECT_NAME}/${CMAKE_BUILD_TYPE}/include
+                include/${PROJECT_NAME}
     )
 
+    install(
+            FILES
+                cmake/YACLConfig.cmake
+            DESTINATION
+                lib/${PROJECT_NAME}
+    )
+
+    target_include_directories(${PROJECT_NAME} PUBLIC $<INSTALL_INTERFACE:include/${PROJECT_NAME}>)
+
 else()
-    target_compile_options(yacl
+    target_compile_options(${PROJECT_NAME}
             PUBLIC
                 -Wall
                 -std=c11
