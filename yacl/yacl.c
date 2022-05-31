@@ -152,7 +152,6 @@ static int32_t _get_argv_cb()
 			}
 			else
 				break;
-
 		}
 	}
 
