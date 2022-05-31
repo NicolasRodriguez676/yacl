@@ -122,7 +122,7 @@ void yacl_empty_buf()
 const char* yacl_error_desc(yacl_error_t error)
 {
 	static const error_desc_t error_desc[] = {
-		{ YACL_SUCCESS,         "no errors. good to go"                      },
+		{ YACL_SUCCESS,         "no errors. good to go"                     },
 		{ YACL_UNKNOWN_CMD,     "command was not found in given commands"   },
 		{ YACL_NO_CMD,          "command incomplete"                        },
 		{ YACL_BUF_FULL,        "buffer full. try emptying buffer"          },
