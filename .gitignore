@@ -1,3 +1,5 @@
 /cmake-embedded-debug/
 /cmake-embedded-release/
 /cmake-windows-debug/
+/Examples/toggle-led/.idea/
+/Examples/toggle-led/cmake-embedded-debug/
