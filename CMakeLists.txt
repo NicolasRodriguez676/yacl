@@ -7,10 +7,26 @@ if (${BUILD-EMBEDDED})
     set(CMAKE_INSTALL_PREFIX $ENV{EMBEDDED_LIBS})
 endif()
 
-project(YACL C ASM)
+project(YACL
+        LANGUAGES
+            C
+            ASM
+        VERSION
+            0.1)
 
 add_library(${PROJECT_NAME} STATIC)
 target_sources(${PROJECT_NAME} PRIVATE yacl/yacl.c yacl/yacl.h)
+set_target_properties(${PROJECT_NAME} PROPERTIES PUBLIC_HEADER yacl/yacl.h)
+
+target_compile_options(${PROJECT_NAME}
+        PRIVATE
+            -O2
+            -std=c11
+            -Wall
+            -Wextra
+            -Werror=implicit-function-declaration
+            -Wno-unused-parameter
+        )
 
 if (${BUILD-EMBEDDED})
     target_compile_options(${PROJECT_NAME}
@@ -18,51 +34,43 @@ if (${BUILD-EMBEDDED})
                 -mcpu=cortex-m4
                 -mfpu=fpv4-sp-d16
                 -mfloat-abi=hard
-                -Wall
-            PRIVATE
-                -std=c11
             )
 
-    install(
-            TARGETS
-                ${PROJECT_NAME}
-            EXPORT
-                ${PROJECT_NAME}
-            DESTINATION
-                lib/${PROJECT_NAME}/${CMAKE_BUILD_TYPE}
-    )
+    if (${CMAKE_BUILD_TYPE} MATCHES "^[Rr]elease")
+        install(
+                TARGETS
+                    ${PROJECT_NAME}
+                EXPORT
+                    ${PROJECT_NAME}
+                DESTINATION
+                    lib/${PROJECT_NAME}-${PROJECT_VERSION}/${CMAKE_BUILD_TYPE}
+                PUBLIC_HEADER DESTINATION
+                    include/${PROJECT_NAME}-${PROJECT_VERSION}
+        )
 
-    install(
-            EXPORT
-                ${PROJECT_NAME}
-            NAMESPACE
-                ${PROJECT_NAME}::
-            DESTINATION
-                lib/${PROJECT_NAME}/${CMAKE_BUILD_TYPE}
-    )
+        install(
+                EXPORT
+                    ${PROJECT_NAME}
+                NAMESPACE
+                    ${PROJECT_NAME}::
+                DESTINATION
+                    lib/${PROJECT_NAME}-${PROJECT_VERSION}/${CMAKE_BUILD_TYPE}
+        )
 
-    install(
-            FILES
-                yacl/yacl.h
-            DESTINATION
-                include/${PROJECT_NAME}
-    )
+        configure_file(cmake/YACLConfig-version.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/YACLConfig-version.cmake @ONLY)
 
-    install(
-            FILES
-                cmake/YACLConfig.cmake
-            DESTINATION
-                lib/${PROJECT_NAME}
-    )
+        install(
+                FILES
+                    cmake/YACLConfig.cmake
+                    ${CMAKE_CURRENT_BINARY_DIR}/YACLConfig-version.cmake
+                DESTINATION
+                    lib/${PROJECT_NAME}-${PROJECT_VERSION}
+        )
 
-    target_include_directories(${PROJECT_NAME} PUBLIC $<INSTALL_INTERFACE:include/${PROJECT_NAME}>)
+        target_include_directories(${PROJECT_NAME} PUBLIC $<INSTALL_INTERFACE:include/${PROJECT_NAME}-${PROJECT_VERSION}>)
+
+    endif()
 
 else()
-    target_compile_options(${PROJECT_NAME}
-            PUBLIC
-                -Wall
-                -std=c11
-            )
-
     add_subdirectory(tests)
 endif()
