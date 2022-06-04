@@ -13,7 +13,7 @@ typedef enum yacl_error {
 	YACL_BUF_FULL = 3,
 	YACL_ARGS_FULL = 4,
 	YACL_INT_OVRN = 5,
-	YACL_BUFR_EMPTD = 5,
+	YACL_BUFR_EMPTD = 6,
 
 } yacl_error_t;
 
