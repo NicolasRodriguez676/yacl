@@ -12,6 +12,8 @@ typedef enum yacl_error {
 	YACL_NO_CMD = 2,
 	YACL_BUF_FULL = 3,
 	YACL_ARGS_FULL = 4,
+	YACL_INT_OVRN = 5,
+	YACL_BUFR_EMPTD = 5,
 
 } yacl_error_t;
 
@@ -24,7 +26,7 @@ typedef struct yacl_cmd_cb {
 //      FUNCTIONS
 
 void yacl_init(yacl_cmd_cb_t* usr_cmd, uint32_t usr_cmd_size, void (* print_func)(char));
-void yacl_empty_buf();
+//void _empty_buf();
 
 yacl_error_t yacl_parse_cmd();
 yacl_error_t yacl_wr_buf(char data);
