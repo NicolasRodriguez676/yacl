@@ -12,7 +12,7 @@ project(YACL
             C
             ASM
         VERSION
-            0.1)
+            0.2)
 
 add_library(${PROJECT_NAME} STATIC)
 target_sources(${PROJECT_NAME} PRIVATE yacl/yacl.c yacl/yacl.h)
