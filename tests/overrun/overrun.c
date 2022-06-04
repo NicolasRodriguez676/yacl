@@ -50,8 +50,6 @@ int main(int argc, char** argv)
 	error = yacl_parse_cmd();
 	LOG_DEBUG("%s\n", yacl_error_desc(error));
 
-	yacl_empty_buf();
-
 	for (uint32_t i = 0; i < strlen(cmd); ++i)
 		yacl_wr_buf(cmd[i]);
 

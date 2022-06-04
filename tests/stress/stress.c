@@ -65,21 +65,16 @@ int main(int argc, char** argv)
 	yacl_error_t error;
 	yacl_init(usr_cmd, sizeof(usr_cmd) / sizeof(usr_cmd[0]), my_print_func);
 
-	char* cmd;
-
 	for (uint32_t j = 0; j < 100000; ++j)
 	{
 		srand(time(0));
 
-		cmd = get_rnd_cmd_str();
+		char* cmd = get_rnd_cmd_str();
 
 		for (uint32_t i = 0; i < strlen(cmd); ++i)
 			yacl_wr_buf(cmd[i]);
 
 		error = yacl_parse_cmd();
-
-		if (error == YACL_ARGS_FULL)
-			yacl_empty_buf();
 	}
 	LOG_DEBUG("%s\n", yacl_error_desc(error));
 

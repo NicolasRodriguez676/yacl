@@ -49,7 +49,7 @@ int main(int argc, char** argv)
 	char** num_tok_endptr = argv + strlen(argv[1]);
 	uint32_t num_toks = strtol(argv[1], num_tok_endptr, 10);
 
-	if (num_toks == 13 && error == YACL_ARGS_FULL)
+	if (num_toks == 13 && error == YACL_BUFRS_EMPTD)
 		return 0;
 
 	return error;
