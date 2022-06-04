@@ -10,7 +10,7 @@ project(toggle-led C ASM)
 
 find_package(CMSIS COMPONENTS STM32F4 REQUIRED)
 find_package(HAL COMPONENTS "STM32F4 LL_RCC LL_GPIO LL_USART CORTEX" REQUIRED)
-find_package(YACL 0.1 REQUIRED)
+find_package(YACL 0.2 REQUIRED)
 
 add_executable(${PROJECT_NAME} toggle-led.c stm32f4xx_hal_conf.h)
 
