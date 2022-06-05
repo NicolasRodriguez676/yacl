@@ -1,4 +1,5 @@
 #include <stddef.h>
+#include <stdio.h>
 #include "yacl.h"
 
 //      TYPES
@@ -64,7 +65,7 @@ static yacl_error_t proc_in_bufr();
 static int32_t      get_argv_cb();
 
 static yacl_error_t bufr_chk();
-static void         empty_bufr();
+static void         empty_bufrs();
 static void         empty_tok_bufr();
 
 //      PUBLIC      ****************************************************************************************************
@@ -81,7 +82,7 @@ yacl_error_t yacl_wr_buf(char data)
 {
 	if (bufr_chk() == YACL_BUF_FULL)
 	{
-		empty_bufr();
+		empty_bufrs();
 		return YACL_BUFRS_EMPTD;
 	}
 
@@ -100,13 +101,17 @@ yacl_error_t yacl_parse_cmd()
 	int32_t cb_idx = get_argv_cb();
 
 	if (cb_idx == NO_CB)
+	{
+		empty_tok_bufr();
 		return YACL_UNKNOWN_CMD;
+	}
 	else
+	{
 		g_usr_cmd[cb_idx].usr_cmd_cb(g_tok_bufr.tok_cnt, (char**)g_tok_bufr.tok_array);
+		empty_tok_bufr();
 
-	empty_tok_bufr();
-
-	return YACL_SUCCESS;
+		return YACL_SUCCESS;
+	}
 }
 
 const char* yacl_error_desc(yacl_error_t error)
@@ -126,9 +131,11 @@ const char* yacl_error_desc(yacl_error_t error)
 
 static yacl_error_t proc_in_bufr()
 {
+	static uint8_t prev_data = DELIM_SPACE;
+
 	int8_t num_new_bytes = g_input_bufr.head  - g_input_bufr.tail;
 
-	if (num_new_bytes <= 1)
+	if (num_new_bytes < 1)
 		return YACL_NO_CMD;
 
 	while(num_new_bytes--)
@@ -139,19 +146,14 @@ static yacl_error_t proc_in_bufr()
 		{
 		case DELIM_SPACE:
 			// handle repeated control characters
-			g_input_bufr.bufr[(g_input_bufr.tail - 1) & 0x7f] = '\0';
-
-			if (g_input_bufr.bufr[(g_input_bufr.tail - 2) & 0x7f] == '\0')
-			{
-				++g_tok_bufr.tok_beg_idx;
+			if (prev_data == DELIM_SPACE)
 				break;
-			}
 
 			// save token. check if enough space left for last arg
 			g_tok_bufr.tok_array[g_tok_bufr.tok_cnt++] = g_tok_bufr.tok_beg_idx + g_tok_bufr.bufr;
 			if (g_tok_bufr.tok_cnt >= YACL_MAX_ARGS)
 			{
-				empty_bufr();
+				empty_bufrs();
 				return YACL_BUFRS_EMPTD;
 			}
 
@@ -163,18 +165,21 @@ static yacl_error_t proc_in_bufr()
 
 		case DELIM_NEWLINE:
 			// handle repeated control characters
-			g_input_bufr.bufr[(g_input_bufr.tail - 1) & 0x7f] = '\0';
+			if (prev_data == DELIM_NEWLINE)
+				break;
 
 			// save and terminate token. return success to proceed into further processing
 			g_tok_bufr.bufr[g_tok_bufr.idx & 0x7f] = '\0';
 			g_tok_bufr.tok_array[g_tok_bufr.tok_cnt++] = g_tok_bufr.tok_beg_idx + g_tok_bufr.bufr;
 
+			prev_data = DELIM_SPACE;
 			return YACL_SUCCESS;
 
 		default:
 			g_tok_bufr.bufr[g_tok_bufr.idx++ & 0x7f] = data;
 		}
 
+		prev_data = data;
 	}
 
 	return YACL_NO_CMD;
@@ -216,7 +221,7 @@ static yacl_error_t bufr_chk()
 		return YACL_SUCCESS;
 }
 
-static void empty_bufr()
+static void empty_bufrs()
 {
 	g_input_bufr.head = 0;
 	g_input_bufr.tail= 0;
