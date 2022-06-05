@@ -1,6 +1,7 @@
 #include <stddef.h>
-#include <stdio.h>
+
 #include "yacl.h"
+#include "vt100/vt100.h"
 
 //      TYPES
 
@@ -10,6 +11,7 @@ enum
 
 	DELIM_SPACE         = 32,
 	DELIM_NEWLINE       = 10,
+	CNTRL_BACKSPACE     = 8,
 
 	YACL_CMD_LEN_MAX    = 128,
 	YACL_MAX_ARGS       = 12
@@ -40,10 +42,10 @@ typedef struct data_buffer {
 
 //      GLOBALS
 
+extern void (*print_func)(char data);
+
 static yacl_cmd_cb_t* g_usr_cmd;
 static uint32_t g_usr_cmd_size;
-
-static void (*print_func)(char data);
 
 static ring_buffer_t g_input_bufr = {
 	.bufr = { 0 },
@@ -70,12 +72,14 @@ static void         empty_tok_bufr();
 
 //      PUBLIC      ****************************************************************************************************
 
-void yacl_init(yacl_cmd_cb_t* usr_cmd, uint32_t usr_cmd_size, void (* m_print_func)(char))
+void yacl_init(yacl_cmd_cb_t* usr_cmd, uint32_t usr_cmd_size, void (* usr_print_func)(char))
 {
 	g_usr_cmd = usr_cmd;
 	g_usr_cmd_size = usr_cmd_size;
 
-	print_func = m_print_func;
+	print_func = usr_print_func;
+
+	vt100_rst_term();
 }
 
 yacl_error_t yacl_wr_buf(char data)
@@ -175,6 +179,19 @@ static yacl_error_t proc_in_bufr()
 			prev_data = DELIM_SPACE;
 			return YACL_SUCCESS;
 
+		case CNTRL_BACKSPACE:
+			// TODO: recover token space
+
+			if (g_tok_bufr.idx == 0 && prev_data == CNTRL_BACKSPACE)
+				break;
+			else if (g_tok_bufr.idx == 0)
+				g_tok_bufr.bufr[g_tok_bufr.idx & 0x7f] = '\0';
+			else
+				g_tok_bufr.bufr[--g_tok_bufr.idx & 0x7f] = '\0';
+
+			vt100_backspace();
+			break;
+
 		default:
 			g_tok_bufr.bufr[g_tok_bufr.idx++ & 0x7f] = data;
 		}
@@ -224,7 +241,7 @@ static yacl_error_t bufr_chk()
 static void empty_bufrs()
 {
 	g_input_bufr.head = 0;
-	g_input_bufr.tail= 0;
+	g_input_bufr.tail = 0;
 
 	empty_tok_bufr();
 }

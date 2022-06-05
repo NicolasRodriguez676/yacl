@@ -12,10 +12,10 @@ project(YACL
             C
             ASM
         VERSION
-            0.2)
+            0.3)
 
 add_library(${PROJECT_NAME} STATIC)
-target_sources(${PROJECT_NAME} PRIVATE yacl/yacl.c yacl/yacl.h)
+target_sources(${PROJECT_NAME} PRIVATE yacl/yacl.c yacl/yacl.h yacl/vt100/vt100.c yacl/vt100/vt100.h)
 set_target_properties(${PROJECT_NAME} PROPERTIES PUBLIC_HEADER yacl/yacl.h)
 
 target_compile_options(${PROJECT_NAME}
