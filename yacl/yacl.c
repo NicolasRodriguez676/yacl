@@ -5,16 +5,19 @@
 
 //      TYPES
 
-enum
-{
-	NO_CB               = -1,
+enum Misc {
+	NO_CB   = -1,
+};
 
+enum Control_Characters {
 	DELIM_SPACE         = 32,
 	DELIM_NEWLINE       = 10,
 	CNTRL_BACKSPACE     = 8,
+};
 
-	YACL_CMD_LEN_MAX    = 128,
-	YACL_MAX_ARGS       = 12
+enum Buffer_Lengths {
+	DATA_LEN_MAX     = 128,
+	MAX_TOKENS       = 12
 };
 
 typedef struct error_desc {
@@ -24,19 +27,19 @@ typedef struct error_desc {
 } error_desc_t;
 
 typedef struct ring_buffer {
-	uint8_t bufr[YACL_CMD_LEN_MAX];
+	uint8_t bufr[DATA_LEN_MAX];
 	uint32_t head;
 	uint32_t tail;
 
 } ring_buffer_t;
 
 typedef struct data_buffer {
-	uint8_t bufr[YACL_CMD_LEN_MAX];
+	uint8_t bufr[DATA_LEN_MAX];
 	uint32_t idx;
 
-	uint8_t* tok_array[YACL_MAX_ARGS];
+	uint8_t* tok_array[MAX_TOKENS];
 	uint32_t tok_beg_idx;
-	uint32_t tok_cnt;
+	uint32_t tok_idx;
 
 } data_buffer_t;
 
@@ -58,7 +61,7 @@ static data_buffer_t g_tok_bufr = {
 	.idx            = 0,
 	.tok_array      = { NULL },
 	.tok_beg_idx    = 0,
-	.tok_cnt        = 0
+	.tok_idx        = 0
 };
 
 //      FUNCTION PROTOTYPES
@@ -111,7 +114,7 @@ yacl_error_t yacl_parse_cmd()
 	}
 	else
 	{
-		g_usr_cmd[cb_idx].usr_cmd_cb(g_tok_bufr.tok_cnt, (char**)g_tok_bufr.tok_array);
+		g_usr_cmd[cb_idx].usr_cmd_cb(g_tok_bufr.tok_idx, (char**)g_tok_bufr.tok_array);
 		empty_tok_bufr();
 
 		return YACL_SUCCESS;
@@ -154,8 +157,8 @@ static yacl_error_t proc_in_bufr()
 				break;
 
 			// save token. check if enough space left for last arg
-			g_tok_bufr.tok_array[g_tok_bufr.tok_cnt++] = g_tok_bufr.tok_beg_idx + g_tok_bufr.bufr;
-			if (g_tok_bufr.tok_cnt >= YACL_MAX_ARGS)
+			g_tok_bufr.tok_array[g_tok_bufr.tok_idx++] = g_tok_bufr.tok_beg_idx + g_tok_bufr.bufr;
+			if (g_tok_bufr.tok_idx >= MAX_TOKENS)
 			{
 				empty_bufrs();
 				return YACL_BUFRS_EMPTD;
@@ -174,7 +177,7 @@ static yacl_error_t proc_in_bufr()
 
 			// save and terminate token. return success to proceed into further processing
 			g_tok_bufr.bufr[g_tok_bufr.idx & 0x7f] = '\0';
-			g_tok_bufr.tok_array[g_tok_bufr.tok_cnt++] = g_tok_bufr.tok_beg_idx + g_tok_bufr.bufr;
+			g_tok_bufr.tok_array[g_tok_bufr.tok_idx++] = g_tok_bufr.tok_beg_idx + g_tok_bufr.bufr;
 
 			prev_data = DELIM_SPACE;
 			return YACL_SUCCESS;
@@ -230,7 +233,7 @@ static int32_t get_argv_cb()
 
 static yacl_error_t bufr_chk()
 {
-	uint8_t empty_bytes = YACL_CMD_LEN_MAX - (g_input_bufr.head - g_input_bufr.tail);
+	uint8_t empty_bytes = DATA_LEN_MAX - (g_input_bufr.head - g_input_bufr.tail);
 
 	if (empty_bytes <= 1)
 		return YACL_BUF_FULL;
@@ -249,6 +252,6 @@ static void empty_bufrs()
 void empty_tok_bufr()
 {
 	g_tok_bufr.tok_beg_idx = 0;
-	g_tok_bufr.tok_cnt = 0;
+	g_tok_bufr.tok_idx = 0;
 	g_tok_bufr.idx = 0;
 }
