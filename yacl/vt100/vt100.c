@@ -2,10 +2,6 @@
 
 // https://tintin.mudhalla.net/info/vt100/
 
-enum VT_100_Control_Sequences {
-	ESC = 0x1b,
-	CSI = 0x5b
-};
 
 void (*print_func)(char data);
 
