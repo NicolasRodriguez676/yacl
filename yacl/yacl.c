@@ -1,5 +1,3 @@
-#include <stddef.h>
-
 #include "yacl.h"
 #include "vt100/vt100.h"
 
@@ -64,6 +62,8 @@ static data_buffer_t g_tok_bufr = {
 	.tok_idx        = 0
 };
 
+const char* lut = "0123456789abcdef";
+
 //      FUNCTION PROTOTYPES
 
 static yacl_error_t proc_in_bufr();
@@ -72,6 +72,9 @@ static int32_t      get_argv_cb();
 static yacl_error_t bufr_chk();
 static void         empty_bufrs();
 static void         empty_tok_bufr();
+//static void         psh_token();
+//static void         pop_token();
+//static void         wrt_token(uint8_t data);
 
 //      PUBLIC      ****************************************************************************************************
 
@@ -114,7 +117,19 @@ yacl_error_t yacl_parse_cmd()
 	}
 	else
 	{
-		g_usr_cmd[cb_idx].usr_cmd_cb(g_tok_bufr.tok_idx, (char**)g_tok_bufr.tok_array);
+		if (cb_idx == 1)
+		{
+			uint32_t data_in;
+			g_usr_cmd[cb_idx].usr_cmd_cb(g_tok_bufr.tok_idx, (char**)g_tok_bufr.tok_array, &data_in);
+			print_func('\n');
+			print_func('[');
+			print_func(lut[data_in & 0x0f]);
+			print_func(']');
+			print_func('\n');
+		}
+		else
+			g_usr_cmd[cb_idx].usr_cmd_cb(g_tok_bufr.tok_idx, (char**)g_tok_bufr.tok_array, NULL);
+
 		empty_tok_bufr();
 
 		return YACL_SUCCESS;

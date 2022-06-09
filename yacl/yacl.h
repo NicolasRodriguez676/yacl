@@ -1,6 +1,7 @@
 #ifndef _YACL_H_
 #define _YACL_H_
 
+#include <stddef.h>
 #include <stdint.h>
 
 
@@ -17,13 +18,14 @@ typedef enum yacl_error {
 
 typedef struct yacl_cmd_cb {
 	char* usr_cmd;
-	void (*usr_cmd_cb)(uint32_t argc, char** argv);
+	void (* usr_cmd_cb)(uint32_t argc, char** argv, uint32_t* data_out);
 
 } yacl_cmd_cb_t;
 
+
 //      FUNCTIONS
 
-void yacl_init(yacl_cmd_cb_t* usr_cmd, uint32_t usr_cmd_size, void (* print_func)(char));
+void yacl_init(yacl_cmd_cb_t* usr_cmd, uint32_t usr_cmd_size, void (* usr_print_func)(char));
 
 yacl_error_t yacl_parse_cmd();
 yacl_error_t yacl_wr_buf(char data);

@@ -5,6 +5,7 @@
 #include <stm32f4xx_hal.h>
 
 #include "yacl.h"
+#include "i2c.h"
 
 // STM32F4-Nucleo green led - PA5
 #define LED_PORT                GPIOA
@@ -13,13 +14,13 @@
 
 void initGPIO();
 void initUART();
-void my_callback(uint32_t argc, char** argv);
+void my_callback(uint32_t argc, char** argv, uint32_t* data_out);
 void my_print_func(char data);
 
 yacl_cmd_cb_t usr_cmd[] = {
 	{ "help", my_callback },
-	{ "read", my_callback },
-	{ "write", my_callback },
+	{ "read", i2c_read },
+	{ "write", i2c_write },
 };
 
 void UART5_IRQHandler(void)
@@ -33,6 +34,21 @@ void UART5_IRQHandler(void)
 	}
 }
 
+void foo_set()
+{
+	LL_GPIO_SetOutputPin(LED_PORT, LED_PIN);
+}
+
+void foo_rst()
+{
+	LL_GPIO_ResetOutputPin(LED_PORT, LED_PIN);
+}
+
+void foo_get(uint32_t* data_out)
+{
+	*data_out = LL_GPIO_IsOutputPinSet(LED_PORT, LED_PIN);
+}
+
 int main(void)
 {
 	HAL_Init();
@@ -44,6 +60,7 @@ int main(void)
 	HAL_SYSTICK_Config(SystemCoreClock / 1000);
 
 	yacl_init(usr_cmd, sizeof(usr_cmd) / sizeof(usr_cmd[0]), my_print_func);
+	i2c_init(foo_set, foo_rst, foo_get);
 
 	LL_USART_EnableIT_RXNE(UART5);
 
@@ -60,21 +77,14 @@ int main(void)
 void my_print_func(char data)
 {
 	LL_USART_TransmitData8(UART5, (uint8_t)data);
-	HAL_Delay(5);
+	HAL_Delay(2);
 }
 
-void my_callback(uint32_t argc, char** argv)
+void my_callback(uint32_t argc, char** argv, uint32_t* data_out)
 {
-	if (argc == 0)
-		return;
-
-	if (argv[0][0] == 'w')
-	{
-		if (argv[1][0] == '1')
-			LL_GPIO_SetOutputPin(LED_PORT, LED_PIN);
-		else if (argv[1][0] == '0')
-			LL_GPIO_ResetOutputPin(LED_PORT, LED_PIN);
-	}
+	my_print_func('h');
+	my_print_func('i');
+	my_print_func('\n');
 }
 
 void initGPIO()
