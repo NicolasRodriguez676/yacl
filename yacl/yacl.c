@@ -1,3 +1,5 @@
+#include <stdbool.h>
+
 #include "yacl.h"
 #include "yacl_types.h"
 
@@ -22,22 +24,22 @@ static comm_lut_cb_t g_comm_lut_cb = {
 
 static ring_buffer_t g_input_bufr = { .bufr = { 0 }, .head = 0, .tail = 0 };
 
-static data_buffer_t g_tok_bufr = { .bufr = { 0 }, .idx= 0, .tok_array= { NULL }, .tok_beg_idx = 0, .tok_idx = 0 };
+static data_buffer_t g_tok_bufr = { .bufr = { 0 }, .idx= 0, .tok_array= { NULL }, .tok_cnt = 0 };
 
 //      FUNCTION PROTOTYPES
 
 static yacl_error_t proc_in_bufr();
 static yacl_error_t get_comm_lut_idxs(uint32_t* protocol_idx, uint32_t* action_idx);
-static _Bool        compare_tokens(const char* str_lhs, const char* str_rhs);
+static bool         compare_tokens(const char* str_lhs, const char* str_rhs);
 
 static yacl_error_t bufr_chk();
 static void         empty_bufrs();
 static void         empty_tok_bufr();
 static void         psh_token();
-//static void         pop_token();
-static void         nxt_token();
+static void         pop_token();
 static void         null_term_token();
-static void         wrt_token(uint8_t data);
+static void         wrt_to_token(uint8_t data);
+static void         rm_from_token(bool dec_idx);
 
 //      PUBLIC      ****************************************************************************************************
 
@@ -51,6 +53,9 @@ void yacl_init(yacl_usr_callbacks_t* usr_callbacks)
 
 	g_comm_lut_cb.funcs[I2C_CB_IDX][READ_CB_IDX] = usr_callbacks->i2c_funcs[READ_CB_IDX];
 	g_comm_lut_cb.funcs[I2C_CB_IDX][WRITE_CB_IDX] = usr_callbacks->i2c_funcs[WRITE_CB_IDX];
+
+	for (uint32_t i = 0; i < MAX_TOKENS; ++i)
+		g_tok_bufr.tok_array[i] = g_tok_bufr.bufr + (MAX_TOKEN_LEN * i);
 
 	vt100_rst_term();
 }
@@ -124,7 +129,8 @@ static yacl_error_t proc_in_bufr()
 {
 	static uint8_t prev_data = DELIM_SPACE;
 
-	int8_t num_new_bytes = g_input_bufr.head  - g_input_bufr.tail;
+	uint32_t num_new_bytes = g_input_bufr.head - g_input_bufr.tail;
+	bool dec_idx_when_rmv;
 
 	if (num_new_bytes < 1)
 		return YACL_NO_CMD;
@@ -142,13 +148,12 @@ static yacl_error_t proc_in_bufr()
 
 			psh_token();
 
-			if (g_tok_bufr.tok_idx >= MAX_TOKENS)
+			if (g_tok_bufr.tok_cnt >= MAX_TOKENS)
 			{
 				empty_bufrs();
 				return YACL_BUFRS_EMPTD;
 			}
 
-			nxt_token();
 			break;
 
 		case DELIM_NEWLINE:
@@ -162,20 +167,28 @@ static yacl_error_t proc_in_bufr()
 			return YACL_SUCCESS;
 
 		case CNTRL_BACKSPACE:
-			// TODO: recover token space
-
-			if (g_tok_bufr.idx == 0 && prev_data == CNTRL_BACKSPACE)
-				break;
+			if (g_tok_bufr.idx == 0 && g_tok_bufr.tok_cnt == 0)
+			{
+				dec_idx_when_rmv = false;
+				rm_from_token(dec_idx_when_rmv);
+			}
 			else if (g_tok_bufr.idx == 0)
-				g_tok_bufr.bufr[g_tok_bufr.idx & 0x7f] = '\0';
+			{
+				pop_token();
+				dec_idx_when_rmv = true;
+				rm_from_token(dec_idx_when_rmv);
+			}
 			else
-				g_tok_bufr.bufr[--g_tok_bufr.idx & 0x7f] = '\0';
+			{
+				dec_idx_when_rmv = true;
+				rm_from_token(dec_idx_when_rmv);
+			}
 
 			vt100_backspace();
 			break;
 
 		default:
-			wrt_token(data);
+			wrt_to_token(data);
 		}
 
 		prev_data = data;
@@ -186,7 +199,7 @@ static yacl_error_t proc_in_bufr()
 
 static yacl_error_t get_comm_lut_idxs(uint32_t* protocol_idx, uint32_t* action_idx)
 {
-	_Bool token_is_valid = 0;
+	bool token_is_valid = false;
 
 	for ( ; *protocol_idx < g_comm_lut_cb.num_protocols; ++*protocol_idx)
 	{
@@ -213,7 +226,7 @@ static yacl_error_t get_comm_lut_idxs(uint32_t* protocol_idx, uint32_t* action_i
 	return YACL_SUCCESS;
 }
 
-static _Bool compare_tokens(const char* str_lhs, const char* str_rhs)
+static bool compare_tokens(const char* str_lhs, const char* str_rhs)
 {
     uint32_t str_idx = 0;
 
@@ -222,18 +235,18 @@ static _Bool compare_tokens(const char* str_lhs, const char* str_rhs)
 		if (str_lhs[str_idx] == str_rhs[str_idx])
 		{
 			if (str_lhs[str_idx] == '\0')
-				return 1;
+				return true;
 			else
 				++str_idx;
 		}
 		else
-			return 0;
+			return false;
 	}
 }
 
 static yacl_error_t bufr_chk()
 {
-	uint8_t empty_bytes = DATA_LEN_MAX - (g_input_bufr.head - g_input_bufr.tail);
+	uint8_t empty_bytes = MAX_DATA_LEN - (g_input_bufr.head - g_input_bufr.tail);
 
 	if (empty_bytes <= 1)
 		return YACL_BUF_FULL;
@@ -249,30 +262,39 @@ static void empty_bufrs()
 	empty_tok_bufr();
 }
 
-void empty_tok_bufr()
+static void empty_tok_bufr()
 {
-	g_tok_bufr.tok_beg_idx = 0;
-	g_tok_bufr.tok_idx = 0;
+	g_tok_bufr.tok_cnt = 0;
 	g_tok_bufr.idx = 0;
 }
 
-void psh_token()
+static void psh_token()
 {
-	g_tok_bufr.tok_array[g_tok_bufr.tok_idx++] = g_tok_bufr.tok_beg_idx + g_tok_bufr.bufr;
 	null_term_token();
+	g_tok_bufr.idx = 0;
+	++g_tok_bufr.tok_cnt;
 }
 
-void nxt_token()
+static void pop_token()
 {
-	g_tok_bufr.tok_beg_idx = g_tok_bufr.idx;
+	g_tok_bufr.idx = g_tok_bufr.tok_array[--g_tok_bufr.tok_cnt][TOKENS_LEN_IDX];
 }
 
-void null_term_token()
+static void null_term_token()
 {
-	g_tok_bufr.bufr[g_tok_bufr.idx++ & 0x7f] = '\0';
+	g_tok_bufr.tok_array[g_tok_bufr.tok_cnt][TOKENS_LEN_IDX] = g_tok_bufr.idx;
+	g_tok_bufr.tok_array[g_tok_bufr.tok_cnt][g_tok_bufr.idx] = '\0';
 }
 
-void wrt_token(uint8_t data)
+static void wrt_to_token(uint8_t data)
 {
-	g_tok_bufr.bufr[g_tok_bufr.idx++ & 0x7f] = data;
+	g_tok_bufr.tok_array[g_tok_bufr.tok_cnt][g_tok_bufr.idx++] = data;
+}
+
+static void rm_from_token(bool dec_idx)
+{
+	if (dec_idx)
+		g_tok_bufr.tok_array[g_tok_bufr.tok_cnt][--g_tok_bufr.idx] = '\0';
+	else
+		g_tok_bufr.tok_array[g_tok_bufr.tok_cnt][g_tok_bufr.idx] = '\0';
 }

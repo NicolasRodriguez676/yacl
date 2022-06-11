@@ -2,10 +2,6 @@
 #define _YACL_TYPES_H_
 
 
-enum Misc {
-	NO_CB   = -1,
-};
-
 enum Control_Characters {
 	DELIM_SPACE         = 32,
 	DELIM_NEWLINE       = 10,
@@ -13,7 +9,7 @@ enum Control_Characters {
 };
 
 enum Buffer_Lengths {
-	DATA_LEN_MAX     = 128,
+	MAX_DATA_LEN     = 128,
 	MAX_TOKEN_LEN    = 16,
 	MAX_TOKENS       = 12,
 	TOKENS_LEN_IDX   = 15
@@ -36,7 +32,7 @@ typedef struct error_desc {
 } error_desc_t;
 
 typedef struct ring_buffer {
-	uint8_t bufr[DATA_LEN_MAX];
+	uint8_t bufr[MAX_DATA_LEN];
 	uint32_t head;
 	uint32_t tail;
 
@@ -47,8 +43,7 @@ typedef struct data_buffer {
 	uint32_t idx;
 
 	uint8_t* tok_array[MAX_TOKENS];
-	uint32_t tok_beg_idx;
-	uint32_t tok_idx;
+	uint32_t tok_cnt;
 
 } data_buffer_t;
 
