@@ -10,16 +10,16 @@
 usr_printf_t yacl_printf;
 usr_snprintf_t yacl_snprintf;
 
-cb_funcs_t gpio_funcs[2];
-cb_funcs_t i2c_funcs[2];
+static cb_funcs_t gpio_funcs[2];
+static cb_funcs_t i2c_funcs[2];
 
-static comm_lut_cb_t g_comm_lut_cb = {
+static comm_lut_cb_t g_cmd_cbs = {
 	.protocols = { "gpio", "i2c" },
 	.actions = { "read", "write" },
 	.funcs = { gpio_funcs, i2c_funcs },
 
-	.num_protocols = sizeof (g_comm_lut_cb.protocols) / sizeof (g_comm_lut_cb.protocols[0]),
-	.num_actions = sizeof (g_comm_lut_cb.actions) / sizeof (g_comm_lut_cb.actions[0])
+	.num_protocols = sizeof (g_cmd_cbs.protocols) / sizeof (g_cmd_cbs.protocols[0]),
+	.num_actions = sizeof (g_cmd_cbs.actions) / sizeof (g_cmd_cbs.actions[0])
 };
 
 static ring_buffer_t g_input_bufr = { .bufr = { 0 }, .head = 0, .tail = 0 };
@@ -48,11 +48,11 @@ void yacl_init(yacl_usr_callbacks_t* usr_callbacks)
 	yacl_printf = usr_callbacks->usr_print_funcs.usr_printf;
 	yacl_snprintf = usr_callbacks->usr_print_funcs.usr_snprintf;
 
-	g_comm_lut_cb.funcs[GPIO_CB_IDX][READ_CB_IDX] = usr_callbacks->gpio_funcs[READ_CB_IDX];
-	g_comm_lut_cb.funcs[GPIO_CB_IDX][WRITE_CB_IDX] = usr_callbacks->gpio_funcs[WRITE_CB_IDX];
+	g_cmd_cbs.funcs[GPIO_CB_IDX][READ_CB_IDX] = usr_callbacks->gpio_funcs[READ_CB_IDX];
+	g_cmd_cbs.funcs[GPIO_CB_IDX][WRITE_CB_IDX] = usr_callbacks->gpio_funcs[WRITE_CB_IDX];
 
-	g_comm_lut_cb.funcs[I2C_CB_IDX][READ_CB_IDX] = usr_callbacks->i2c_funcs[READ_CB_IDX];
-	g_comm_lut_cb.funcs[I2C_CB_IDX][WRITE_CB_IDX] = usr_callbacks->i2c_funcs[WRITE_CB_IDX];
+	g_cmd_cbs.funcs[I2C_CB_IDX][READ_CB_IDX] = usr_callbacks->i2c_funcs[READ_CB_IDX];
+	g_cmd_cbs.funcs[I2C_CB_IDX][WRITE_CB_IDX] = usr_callbacks->i2c_funcs[WRITE_CB_IDX];
 
 	for (uint32_t i = 0; i < MAX_TOKENS; ++i)
 		g_tok_bufr.tok_array[i] = g_tok_bufr.bufr + (MAX_TOKEN_LEN * i);
@@ -101,7 +101,7 @@ yacl_error_t yacl_parse_cmd()
 		else if (g_tok_bufr.tok_array[2][0] == '0')
 			data[0] = 0;
 
-		g_comm_lut_cb.funcs[protocol_idx][action_idx](data, data_size);
+		g_cmd_cbs.funcs[protocol_idx][action_idx](data, data_size);
 
 		if (action_idx == READ_CB_IDX)
 			yacl_printf("gpio love level: %d\n\n", data[0]);
@@ -218,9 +218,9 @@ static yacl_error_t get_comm_lut_idxs(uint32_t* protocol_idx, uint32_t* action_i
 {
 	bool token_is_valid = false;
 
-	for ( ; *protocol_idx < g_comm_lut_cb.num_protocols; ++*protocol_idx)
+	for ( ; *protocol_idx < g_cmd_cbs.num_protocols; ++*protocol_idx)
 	{
-		token_is_valid = compare_tokens(g_comm_lut_cb.protocols[*protocol_idx], (char*)g_tok_bufr.tok_array[0]);
+		token_is_valid = compare_tokens(g_cmd_cbs.protocols[*protocol_idx], (char*)g_tok_bufr.tok_array[0]);
 
 		if (token_is_valid)
 			break;
@@ -229,9 +229,9 @@ static yacl_error_t get_comm_lut_idxs(uint32_t* protocol_idx, uint32_t* action_i
 	if (!token_is_valid)
 		return YACL_UNKNOWN_CMD;
 
-	for ( ; *action_idx < g_comm_lut_cb.num_actions; ++*action_idx)
+	for ( ; *action_idx < g_cmd_cbs.num_actions; ++*action_idx)
 	{
-		token_is_valid = compare_tokens(g_comm_lut_cb.actions[*action_idx], (char*)g_tok_bufr.tok_array[1]);
+		token_is_valid = compare_tokens(g_cmd_cbs.actions[*action_idx], (char*)g_tok_bufr.tok_array[1]);
 
 		if (token_is_valid)
 			break;
