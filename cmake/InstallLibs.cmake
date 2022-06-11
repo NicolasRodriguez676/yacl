@@ -19,7 +19,7 @@ function(install_lib LIB_NAME)
                 lib/${LIB_NAME}-${PROJECT_VERSION}/${CMAKE_BUILD_TYPE}
     )
 
-    configure_file(${CMAKE_SOURCE_DIR}/cmake/${LIB_NAME}Config-version.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/I2CConfig-version.cmake @ONLY)
+    configure_file(${CMAKE_SOURCE_DIR}/cmake/${LIB_NAME}Config-version.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/${LIB_NAME}Config-version.cmake @ONLY)
 
     install(
             FILES

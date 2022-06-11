@@ -19,11 +19,8 @@ add_subdirectory(yacl)
 if (${BUILD-EMBEDDED})
     include(cmake/InstallLibs.cmake)
 
-    add_subdirectory(comm/i2c)
-
     if (${CMAKE_BUILD_TYPE} MATCHES "^[Rr]elease")
         install_lib(${PROJECT_NAME})
-        install_lib(I2C)
     endif()
 else()
     add_subdirectory(tests)
