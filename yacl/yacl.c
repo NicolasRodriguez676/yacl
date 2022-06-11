@@ -38,7 +38,7 @@ static void         empty_tok_bufr();
 static void         psh_token();
 static void         pop_token();
 static void         null_term_token();
-static void         wrt_to_token(uint8_t data);
+static bool wrt_to_token(uint8_t data);
 static void         rm_from_token(bool dec_idx);
 
 //      PUBLIC      ****************************************************************************************************
@@ -58,6 +58,7 @@ void yacl_init(yacl_usr_callbacks_t* usr_callbacks)
 		g_tok_bufr.tok_array[i] = g_tok_bufr.bufr + (MAX_TOKEN_LEN * i);
 
 	vt100_rst_term();
+	vt100_yacl_view();
 }
 
 yacl_error_t yacl_wr_buf(char data)
@@ -103,9 +104,11 @@ yacl_error_t yacl_parse_cmd()
 		g_comm_lut_cb.funcs[protocol_idx][action_idx](data, data_size);
 
 		if (action_idx == READ_CB_IDX)
-			yacl_printf("gpio love level: %d\n", data[0]);
+			yacl_printf("gpio love level: %d\n\n", data[0]);
 
 		empty_bufrs();
+		vt100_yacl_view();
+
 		return YACL_SUCCESS;
 	}
 }
@@ -188,7 +191,17 @@ static yacl_error_t proc_in_bufr()
 			break;
 
 		default:
-			wrt_to_token(data);
+			if (wrt_to_token(data))
+				break;
+			else
+			{
+				empty_bufrs();
+
+				vt100_error("ERROR: Token overrun");
+				vt100_yacl_view();
+
+				return YACL_BUFRS_EMPTD;
+			}
 		}
 
 		prev_data = data;
@@ -286,9 +299,13 @@ static void null_term_token()
 	g_tok_bufr.tok_array[g_tok_bufr.tok_cnt][g_tok_bufr.idx] = '\0';
 }
 
-static void wrt_to_token(uint8_t data)
+static bool wrt_to_token(uint8_t data)
 {
+	if (g_tok_bufr.idx + 1 >= MAX_TOKEN_LEN - 2)
+		return false;
+
 	g_tok_bufr.tok_array[g_tok_bufr.tok_cnt][g_tok_bufr.idx++] = data;
+	return true;
 }
 
 static void rm_from_token(bool dec_idx)

@@ -18,6 +18,16 @@ void vt100_rst_term()
 	yacl_printf("%s", vt100_rst);
 }
 
+void vt100_yacl_view()
+{
+	yacl_printf(">> ");
+}
+
+void vt100_error(const char* error_str)
+{
+	yacl_printf("\n%s\n\n", error_str);
+}
+
 void vt100_backspace()
 {
 	char vt100_bk_sp[5];
