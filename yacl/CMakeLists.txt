@@ -4,18 +4,20 @@ target_sources(${PROJECT_NAME}
         PRIVATE
             yacl.c
             yacl.h
-            vt100/vt100.c
-            vt100/vt100.h
 )
+
+add_subdirectory(vt100)
+
+target_include_directories(${PROJECT_NAME} PRIVATE vt100)
 
 set_target_properties(${PROJECT_NAME}
         PROPERTIES
-            PUBLIC_HEADER
-            ${CMAKE_SOURCE_DIR}/yacl/yacl.h
+            PUBLIC_HEADER ${CMAKE_SOURCE_DIR}/yacl/yacl.h
 )
 
 target_compile_options(${PROJECT_NAME}
     PUBLIC
+        -fno-builtin-printf
         -mcpu=cortex-m4
         -mfpu=fpv4-sp-d16
         -mfloat-abi=hard

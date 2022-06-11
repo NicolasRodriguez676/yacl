@@ -1,6 +1,9 @@
 #ifndef _VT100_H_
 #define _VT100_H_
 
+#include <stddef.h>
+#include <stdint.h>
+
 enum VT_100_Control_Sequences {
 	ESC = 0x1b,
 	CSI = 0x5b

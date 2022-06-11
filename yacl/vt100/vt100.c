@@ -1,20 +1,32 @@
 #include "vt100.h"
+#include "../yacl.h"
 
 // https://tintin.mudhalla.net/info/vt100/
 
+extern usr_printf_t yacl_printf;
+//extern int (* yacl_snprintf)(char* buffer, size_t count, const char* format, ...);
 
-void (*print_func)(char data);
 
 void vt100_rst_term()
 {
-	print_func(ESC);
-	print_func('c');
+	char vt100_rst[3];
+
+	vt100_rst[0] = ESC;
+	vt100_rst[1] = 'c';
+	vt100_rst[2] = '\0';
+
+	yacl_printf("%s", vt100_rst);
 }
 
 void vt100_backspace()
 {
-	print_func(ESC);
-	print_func(CSI);
-	print_func(1);
-	print_func('X');
+	char vt100_bk_sp[5];
+
+	vt100_bk_sp[0] = ESC;
+	vt100_bk_sp[1] = CSI;
+	vt100_bk_sp[2] = 1;
+	vt100_bk_sp[3] = 'X';
+	vt100_bk_sp[4] = '\0';
+
+	yacl_printf("%s", vt100_bk_sp);
 }
