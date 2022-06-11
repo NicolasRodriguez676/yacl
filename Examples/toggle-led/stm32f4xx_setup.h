@@ -77,7 +77,7 @@ void initUART()
 void my_print_func(char data)
 {
 	LL_USART_TransmitData8(UART5, (uint8_t)data);
-	HAL_Delay(2);
+	HAL_Delay(3);
 }
 
 void _putchar(char character)

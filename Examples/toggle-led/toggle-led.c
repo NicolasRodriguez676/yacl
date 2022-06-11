@@ -1,7 +1,7 @@
 #include "stm32f4xx_setup.h"
 
-void usr_gpio_write(uint32_t* data, uint32_t data_size);
-void usr_gpio_read(uint32_t* data, uint32_t data_size);
+void usr_gpio_write(yacl_inout_data_t* inout_data);
+void usr_gpio_read(yacl_inout_data_t* inout_data);
 
 int main(void)
 {
@@ -34,15 +34,21 @@ int main(void)
 	return 0;
 }
 
-void usr_gpio_write(uint32_t* data, uint32_t data_size)
+void usr_gpio_write(yacl_inout_data_t* inout_data)
 {
-	if (*data)
+	if (inout_data->data)
 		LL_GPIO_SetOutputPin(LED_PORT, LED_PIN);
 	else
 		LL_GPIO_ResetOutputPin(LED_PORT, LED_PIN);
 }
 
-void usr_gpio_read(uint32_t* data, uint32_t data_size)
+void usr_gpio_read(yacl_inout_data_t* inout_data)
 {
-	*data = LL_GPIO_IsOutputPinSet(LED_PORT, LED_PIN);
+	uint32_t i = 0;
+	do
+	{
+		inout_data->bufr[i] = LL_GPIO_IsOutputPinSet(LED_PORT, LED_PIN);
+		++i;
+
+	} while (i < inout_data->beg_reg - inout_data->end_reg);
 }
