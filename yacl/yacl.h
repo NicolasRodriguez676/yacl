@@ -29,7 +29,16 @@ typedef struct usr_print_funcs {
 
 } usr_print_funcs_t;
 
-typedef void (* cb_funcs_t)(uint32_t* data, uint32_t data_size);
+typedef struct yacl_inout_data {
+	uint32_t bufr[16];
+	uint32_t data;
+	uint32_t addr;
+	uint32_t beg_reg;
+	uint32_t end_reg;
+
+} yacl_inout_data_t;
+
+typedef void (* cb_funcs_t)(yacl_inout_data_t* inout_data);
 
 typedef struct yacl_usr_callbacks {
 	usr_print_funcs_t usr_print_funcs;
@@ -37,6 +46,8 @@ typedef struct yacl_usr_callbacks {
 	cb_funcs_t i2c_funcs[2];
 
 } yacl_usr_callbacks_t;
+
+
 
 //      FUNCTIONS
 

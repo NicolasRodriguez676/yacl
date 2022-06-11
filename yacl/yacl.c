@@ -1,4 +1,7 @@
 #include <stdbool.h>
+#include <stdlib.h>
+#include <limits.h>
+#include <ctype.h>
 
 #include "yacl.h"
 #include "yacl_types.h"
@@ -10,13 +13,14 @@
 usr_printf_t yacl_printf;
 usr_snprintf_t yacl_snprintf;
 
+static cb_funcs_t help_funcs[1];
 static cb_funcs_t gpio_funcs[2];
 static cb_funcs_t i2c_funcs[2];
 
-static comm_lut_cb_t g_cmd_cbs = {
-	.protocols = { "gpio", "i2c" },
+static protocol_lut_cb_t g_cmd_cbs = {
+	.protocols = { "help", "gpio", "i2c" },
 	.actions = { "read", "write" },
-	.funcs = { gpio_funcs, i2c_funcs },
+	.funcs = { help_funcs, gpio_funcs, i2c_funcs },
 
 	.num_protocols = sizeof (g_cmd_cbs.protocols) / sizeof (g_cmd_cbs.protocols[0]),
 	.num_actions = sizeof (g_cmd_cbs.actions) / sizeof (g_cmd_cbs.actions[0])
@@ -35,11 +39,19 @@ static bool         compare_tokens(const char* str_lhs, const char* str_rhs);
 static yacl_error_t bufr_chk();
 static void         empty_bufrs();
 static void         empty_tok_bufr();
+
 static void         psh_token();
 static void         pop_token();
 static void         null_term_token();
 static bool         wrt_to_token(uint8_t data);
 static void         rm_from_token(bool dec_idx);
+
+static bool         check_arg_count(uint32_t action);
+static bool         conv_args_num(yacl_inout_data_t* inout_data, uint32_t action);
+static bool         get_str_value(uint32_t* data, uint32_t tok_idx);
+static uint32_t     get_prefix(const uint8_t* num_str, uint32_t num_str_size);
+
+static void         help_func();
 
 //      PUBLIC      ****************************************************************************************************
 
@@ -47,6 +59,9 @@ void yacl_init(yacl_usr_callbacks_t* usr_callbacks)
 {
 	yacl_printf = usr_callbacks->usr_print_funcs.usr_printf;
 	yacl_snprintf = usr_callbacks->usr_print_funcs.usr_snprintf;
+
+	g_cmd_cbs.funcs[HELP_CB_IDX][READ_CB_IDX] = help_func;
+	g_cmd_cbs.funcs[HELP_CB_IDX][WRITE_CB_IDX] = help_func;
 
 	g_cmd_cbs.funcs[GPIO_CB_IDX][READ_CB_IDX] = usr_callbacks->gpio_funcs[READ_CB_IDX];
 	g_cmd_cbs.funcs[GPIO_CB_IDX][WRITE_CB_IDX] = usr_callbacks->gpio_funcs[WRITE_CB_IDX];
@@ -89,28 +104,55 @@ yacl_error_t yacl_parse_cmd()
 	if (error != YACL_SUCCESS)
 	{
 		empty_bufrs();
+		vt100_error("ERROR: Unknown command");
+		vt100_yacl_view();
+
 		return error;
 	}
-	else
+
+	if (protocol_idx == HELP_CB_IDX && g_tok_bufr.tok_cnt == 1)
 	{
-		uint32_t data[1];
-		uint32_t data_size = 1;
-
-		if (g_tok_bufr.tok_array[2][0] == '1')
-			data[0] = 1;
-		else if (g_tok_bufr.tok_array[2][0] == '0')
-			data[0] = 0;
-
-		g_cmd_cbs.funcs[protocol_idx][action_idx](data, data_size);
-
-		if (action_idx == READ_CB_IDX)
-			yacl_printf("gpio love level: %d\n\n", data[0]);
+		yacl_inout_data_t inout_data;
+		g_cmd_cbs.funcs[protocol_idx][0](&inout_data);
 
 		empty_bufrs();
 		vt100_yacl_view();
 
 		return YACL_SUCCESS;
 	}
+
+	if (check_arg_count(action_idx) == false)
+	{
+		empty_bufrs();
+		vt100_error("ERROR: Missing args");
+		vt100_yacl_view();
+
+		return YACL_UNKNOWN_CMD;
+	}
+
+	yacl_inout_data_t inout_data;
+
+	if(!conv_args_num(&inout_data, action_idx))
+		return YACL_UNKNOWN_CMD;
+
+	g_cmd_cbs.funcs[protocol_idx][action_idx](&inout_data);
+
+	if (action_idx == READ_CB_IDX)
+	{
+		uint32_t i = 0;
+		do
+		{
+			yacl_printf("%s love level: %d\n", g_cmd_cbs.protocols[protocol_idx], inout_data.bufr[i]);
+			++i;
+
+		} while (i < inout_data.beg_reg - inout_data.end_reg);
+		yacl_printf("\n");
+	}
+
+	empty_bufrs();
+	vt100_yacl_view();
+
+	return YACL_SUCCESS;
 }
 
 const char* yacl_error_desc(yacl_error_t error)
@@ -220,18 +262,20 @@ static yacl_error_t get_comm_lut_idxs(uint32_t* protocol_idx, uint32_t* action_i
 
 	for ( ; *protocol_idx < g_cmd_cbs.num_protocols; ++*protocol_idx)
 	{
-		token_is_valid = compare_tokens(g_cmd_cbs.protocols[*protocol_idx], (char*)g_tok_bufr.tok_array[0]);
+		token_is_valid = compare_tokens(g_cmd_cbs.protocols[*protocol_idx], (char*)g_tok_bufr.tok_array[ARG_PROTOCOL_IDX]);
 
 		if (token_is_valid)
 			break;
 	}
 
-	if (!token_is_valid)
+	if (!token_is_valid && *protocol_idx != HELP_CB_IDX)
 		return YACL_UNKNOWN_CMD;
+	else if (*protocol_idx == HELP_CB_IDX)
+		return YACL_SUCCESS;
 
 	for ( ; *action_idx < g_cmd_cbs.num_actions; ++*action_idx)
 	{
-		token_is_valid = compare_tokens(g_cmd_cbs.actions[*action_idx], (char*)g_tok_bufr.tok_array[1]);
+		token_is_valid = compare_tokens(g_cmd_cbs.actions[*action_idx], (char*)g_tok_bufr.tok_array[ARG_ACTION_IDX]);
 
 		if (token_is_valid)
 			break;
@@ -318,4 +362,111 @@ static void rm_from_token(bool dec_idx)
 		g_tok_bufr.tok_array[g_tok_bufr.tok_cnt][--g_tok_bufr.idx] = '\0';
 	else
 		g_tok_bufr.tok_array[g_tok_bufr.tok_cnt][g_tok_bufr.idx] = '\0';
+}
+
+static bool check_arg_count(uint32_t action)
+{
+	if (action == READ_CB_IDX)
+	{
+		if (g_tok_bufr.tok_cnt >= TOKEN_CNT_READ_MIN)
+			return true;
+		else
+			return false;
+	}
+	else // if (action == WRITE_CB_IDX)
+	{
+		if (g_tok_bufr.tok_cnt >= TOKEN_CNT_WRITE_MIN)
+			return true;
+		else
+			return false;
+	}
+}
+
+static bool conv_args_num(yacl_inout_data_t* inout_data, uint32_t action)
+{
+	if (get_str_value(&inout_data->addr, ARG_ADDR_IDX) == false)
+		return false;
+
+	if (get_str_value(&inout_data->beg_reg, ARG_BEG_REG_IDX) == false)
+		return false;
+
+	if (action == READ_CB_IDX)
+	{
+		if (g_tok_bufr.tok_cnt > ARG_READ_RANGE_CNT)
+		{
+			if (get_str_value(&inout_data->end_reg, ARG_END_REG_IDX) == false)
+				return false;
+		}
+
+		inout_data->end_reg = 0;
+		return true;
+	}
+	else // if (action == WRITE_CB_IDX)
+	{
+		if (g_tok_bufr.tok_cnt > ARG_WRITE_RANGE_CNT)
+		{
+			if (get_str_value(&inout_data->end_reg, ARG_END_REG_IDX) == false)
+				return false;
+			if (get_str_value(&inout_data->data, ARG_DATA1_IDX) == false)
+				return false;
+			return true;
+		}
+
+		inout_data->end_reg = 0;
+		if (get_str_value(&inout_data->data, ARG_DATA0_IDX) == false)
+			return false;
+		return true;
+	}
+}
+
+static bool get_str_value(uint32_t* data, uint32_t tok_idx)
+{
+	uint32_t base = get_prefix(g_tok_bufr.tok_array[tok_idx], g_tok_bufr.tok_array[tok_idx][TOKENS_LEN_IDX]);
+	char * end_ptr = (char*)(g_tok_bufr.tok_array[tok_idx] + g_tok_bufr.tok_array[tok_idx][TOKENS_LEN_IDX]);
+
+	uint32_t i = 0;
+	if (base == 16)
+		i = 2;
+
+	for (; i < g_tok_bufr.tok_array[tok_idx][TOKENS_LEN_IDX]; ++i)
+	{
+		if (!isdigit(g_tok_bufr.tok_array[tok_idx][i]))
+		{
+			empty_bufrs();
+			yacl_printf("\nERROR: Invalid value for arg[%u]\n\n", tok_idx + 1);
+			vt100_yacl_view();
+			return false;
+		}
+	}
+	uint32_t check_result = strtoul((char*)g_tok_bufr.tok_array[tok_idx], &end_ptr, base);
+
+	if (check_result == ULONG_MAX)
+	{
+		empty_bufrs();
+		yacl_printf("\nERROR: arg[%u] is too large\n\n", tok_idx + 1);
+		vt100_yacl_view();
+
+		return false;
+	}
+
+	*data = check_result;
+
+	return true;
+}
+
+static uint32_t get_prefix(const uint8_t* num_str, uint32_t num_str_size)
+{
+	if (num_str[0] == '0' && (num_str[1] == 'x' || num_str[1] == 'X') )
+		return 16;
+	else
+		return 10;
+}
+
+static void help_func(yacl_inout_data_t* inout_data)
+{
+	yacl_printf("\nYACL Help\n\n\t<protocol> <action> <addr> <reg> [reg end] [data]\n\n");
+
+	for (uint32_t i = 1; i <= I2C_CB_IDX; ++i)
+		yacl_printf("%s supports read and write\n", g_cmd_cbs.protocols[i]);
+	yacl_printf("\n");
 }
