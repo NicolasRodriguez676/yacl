@@ -4,7 +4,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-
 //      TYPES
 
 typedef enum yacl_error {
@@ -16,16 +15,32 @@ typedef enum yacl_error {
 
 } yacl_error_t;
 
-typedef struct yacl_cmd_cb {
-	char* usr_cmd;
-	void (* usr_cmd_cb)(uint32_t argc, char** argv, uint32_t* data_out);
+enum Action_Call_Back_Index {
+	READ_CB_IDX = 0,
+	WRITE_CB_IDX = 1
+};
 
-} yacl_cmd_cb_t;
+typedef int (* usr_printf_t)(const char* format, ...);
+typedef int (* usr_snprintf_t)(char* buffer, size_t count, const char* format, ...);
 
+typedef struct usr_print_funcs {
+	usr_printf_t usr_printf;
+	usr_snprintf_t usr_snprintf;
+
+} usr_print_funcs_t;
+
+typedef void (* cb_funcs_t)(uint32_t* data, uint32_t data_size);
+
+typedef struct yacl_usr_callbacks {
+	usr_print_funcs_t usr_print_funcs;
+	cb_funcs_t gpio_funcs[2];
+	cb_funcs_t i2c_funcs[2];
+
+} yacl_usr_callbacks_t;
 
 //      FUNCTIONS
 
-void yacl_init(yacl_cmd_cb_t* usr_cmd, uint32_t usr_cmd_size, void (* usr_print_func)(char));
+void yacl_init(yacl_usr_callbacks_t* usr_callbacks);
 
 yacl_error_t yacl_parse_cmd();
 yacl_error_t yacl_wr_buf(char data);
