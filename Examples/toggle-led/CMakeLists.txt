@@ -11,9 +11,12 @@ project(toggle-led C ASM)
 find_package(CMSIS COMPONENTS STM32F4 REQUIRED)
 find_package(HAL COMPONENTS "STM32F4 LL_RCC LL_GPIO LL_USART CORTEX" REQUIRED)
 find_package(YACL 0.3 REQUIRED)
-find_package(I2C 0.3 REQUIRED)
 
-add_executable(${PROJECT_NAME} toggle-led.c stm32f4xx_hal_conf.h)
+add_executable(${PROJECT_NAME} toggle-led.c stm32f4xx_setup.h stm32f4xx_hal_conf.h)
+
+add_subdirectory(printf)
+
+target_include_directories(${PROJECT_NAME} PRIVATE printf)
 
 target_link_libraries(${PROJECT_NAME}
         PUBLIC
@@ -24,11 +27,11 @@ target_link_libraries(${PROJECT_NAME}
             CMSIS::STM32::F446RE
             STM32::NoSys
             YACL::YACL
-            YACL::I2C
         )
 
 target_compile_options(${PROJECT_NAME}
         PUBLIC
+            -fno-builtin-printf
             -O2
             -DUSE_FULL_LL_DRIVER
             -Wall
