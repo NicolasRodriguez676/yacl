@@ -11,7 +11,7 @@ enum Control_Characters {
 enum Buffer_Lengths {
 	MAX_DATA_LEN     = 128,
 	MAX_TOKEN_LEN    = 16,
-	MAX_TOKENS       = 12,
+	MAX_TOKENS       = 6,
 	TOKENS_LEN_IDX   = 15
 };
 
