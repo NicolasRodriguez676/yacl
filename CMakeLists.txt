@@ -12,7 +12,7 @@ project(YACL
             C
             ASM
         VERSION
-            0.3)
+            0.4)
 
 add_subdirectory(yacl)
 
