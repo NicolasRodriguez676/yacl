@@ -17,11 +17,11 @@ int main(void)
 	callbacks.usr_print_funcs.usr_printf = printf;
 	callbacks.usr_print_funcs.usr_snprintf = snprintf;
 
-	callbacks.gpio_funcs[READ_CB_IDX] = usr_gpio_read;
-	callbacks.gpio_funcs[WRITE_CB_IDX] = usr_gpio_write;
+	callbacks.usr_gpio_read = usr_gpio_read;
+	callbacks.usr_gpio_write = usr_gpio_write;
 
-	callbacks.i2c_funcs[READ_CB_IDX] = usr_gpio_read;
-	callbacks.i2c_funcs[WRITE_CB_IDX] = usr_gpio_write;
+//	callbacks.usr_i2c_read = usr_gpio_read;
+//	callbacks.usr_i2c_write = usr_gpio_write;
 	yacl_init(&callbacks);
 
 	LL_USART_EnableIT_RXNE(UART5);
