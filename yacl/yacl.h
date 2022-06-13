@@ -4,6 +4,15 @@
 #include <stddef.h>
 #include <stdint.h>
 
+enum Inout_Buffer_size{
+
+#ifdef YACL_USR_INOUT_BFR_LEN
+	INOUT_BUFR_LEN = YACL_USR_INOUT_BFR_LEN
+#else
+	INOUT_BUFR_LEN = 16
+#endif
+};
+
 //      TYPES
 
 typedef enum yacl_error {
@@ -30,7 +39,7 @@ typedef struct usr_print_funcs {
 } usr_print_funcs_t;
 
 typedef struct yacl_inout_data {
-	uint32_t bufr[16];
+	uint32_t bufr[INOUT_BUFR_LEN];
 	uint32_t data;
 	uint32_t addr;
 	uint32_t beg_reg;
