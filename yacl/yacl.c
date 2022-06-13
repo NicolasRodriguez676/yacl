@@ -13,21 +13,15 @@
 usr_printf_t yacl_printf;
 usr_snprintf_t yacl_snprintf;
 
-static cb_funcs_t help_funcs[1];
-static cb_funcs_t gpio_funcs[2];
-static cb_funcs_t i2c_funcs[2];
-
 static protocol_lut_cb_t g_cmd_cbs = {
 	.protocols = { "help", "gpio", "i2c" },
 	.actions = { "read", "write" },
-	.funcs = { help_funcs, gpio_funcs, i2c_funcs },
-
-	.num_protocols = sizeof (g_cmd_cbs.protocols) / sizeof (g_cmd_cbs.protocols[0]),
-	.num_actions = sizeof (g_cmd_cbs.actions) / sizeof (g_cmd_cbs.actions[0])
+	.funcs = {{ NULL, NULL }},
+	.not_null_cbs = { false },
+	.num_not_null_cbs = 0
 };
 
 static ring_buffer_t g_input_bufr = { .bufr = { 0 }, .head = 0, .tail = 0 };
-
 static data_buffer_t g_tok_bufr = { .bufr = { 0 }, .idx= 0, .tok_array= { NULL }, .tok_cnt = 0 };
 
 //      FUNCTION PROTOTYPES
@@ -51,7 +45,8 @@ static bool         conv_args_num(yacl_inout_data_t* inout_data, uint32_t action
 static bool         get_str_value(uint32_t* data, uint32_t tok_idx);
 static uint32_t     get_prefix(const uint8_t* num_str, uint32_t num_str_size);
 
-static void         help_func();
+static void         init_cbs(yacl_usr_callbacks_t* usr_callbacks);
+static void         help_func(yacl_inout_data_t* inout_data);
 
 //      PUBLIC      ****************************************************************************************************
 
@@ -60,14 +55,7 @@ void yacl_init(yacl_usr_callbacks_t* usr_callbacks)
 	yacl_printf = usr_callbacks->usr_print_funcs.usr_printf;
 	yacl_snprintf = usr_callbacks->usr_print_funcs.usr_snprintf;
 
-	g_cmd_cbs.funcs[HELP_CB_IDX][READ_CB_IDX] = help_func;
-	g_cmd_cbs.funcs[HELP_CB_IDX][WRITE_CB_IDX] = help_func;
-
-	g_cmd_cbs.funcs[GPIO_CB_IDX][READ_CB_IDX] = usr_callbacks->gpio_funcs[READ_CB_IDX];
-	g_cmd_cbs.funcs[GPIO_CB_IDX][WRITE_CB_IDX] = usr_callbacks->gpio_funcs[WRITE_CB_IDX];
-
-	g_cmd_cbs.funcs[I2C_CB_IDX][READ_CB_IDX] = usr_callbacks->i2c_funcs[READ_CB_IDX];
-	g_cmd_cbs.funcs[I2C_CB_IDX][WRITE_CB_IDX] = usr_callbacks->i2c_funcs[WRITE_CB_IDX];
+	init_cbs(usr_callbacks);
 
 	for (uint32_t i = 0; i < MAX_TOKENS; ++i)
 		g_tok_bufr.tok_array[i] = g_tok_bufr.bufr + (MAX_TOKEN_LEN * i);
@@ -113,7 +101,7 @@ yacl_error_t yacl_parse_cmd()
 	if (protocol_idx == HELP_CB_IDX && g_tok_bufr.tok_cnt == 1)
 	{
 		yacl_inout_data_t inout_data;
-		g_cmd_cbs.funcs[protocol_idx][0](&inout_data);
+		g_cmd_cbs.funcs[protocol_idx][READ_CB_IDX](&inout_data);
 
 		empty_bufrs();
 		vt100_yacl_view();
@@ -135,7 +123,15 @@ yacl_error_t yacl_parse_cmd()
 	if(!conv_args_num(&inout_data, action_idx))
 		return YACL_UNKNOWN_CMD;
 
-	g_cmd_cbs.funcs[protocol_idx][action_idx](&inout_data);
+	if (g_cmd_cbs.not_null_cbs[protocol_idx])
+		g_cmd_cbs.funcs[protocol_idx][action_idx](&inout_data);
+	else
+	{
+		yacl_printf("%s was not provided a callback function\n\n", g_cmd_cbs.protocols[protocol_idx]);
+		empty_bufrs();
+		vt100_yacl_view();
+		return YACL_UNKNOWN_CMD;
+	}
 
 	if (action_idx == READ_CB_IDX)
 	{
@@ -260,7 +256,7 @@ static yacl_error_t get_comm_lut_idxs(uint32_t* protocol_idx, uint32_t* action_i
 {
 	bool token_is_valid = false;
 
-	for ( ; *protocol_idx < g_cmd_cbs.num_protocols; ++*protocol_idx)
+	for ( ; *protocol_idx < NUM_PROTOCOLS; ++*protocol_idx)
 	{
 		token_is_valid = compare_tokens(g_cmd_cbs.protocols[*protocol_idx], (char*)g_tok_bufr.tok_array[ARG_PROTOCOL_IDX]);
 
@@ -273,7 +269,7 @@ static yacl_error_t get_comm_lut_idxs(uint32_t* protocol_idx, uint32_t* action_i
 	else if (*protocol_idx == HELP_CB_IDX)
 		return YACL_SUCCESS;
 
-	for ( ; *action_idx < g_cmd_cbs.num_actions; ++*action_idx)
+	for ( ; *action_idx < NUM_ACTIONS; ++*action_idx)
 	{
 		token_is_valid = compare_tokens(g_cmd_cbs.actions[*action_idx], (char*)g_tok_bufr.tok_array[ARG_ACTION_IDX]);
 
@@ -462,11 +458,33 @@ static uint32_t get_prefix(const uint8_t* num_str, uint32_t num_str_size)
 		return 10;
 }
 
+void init_cbs(yacl_usr_callbacks_t* usr_callbacks)
+{
+	g_cmd_cbs.funcs[HELP_CB_IDX][0] = help_func;
+//	g_cmd_cbs.funcs[HELP_CB_IDX][1] = help_func;
+
+	if (usr_callbacks->usr_gpio_read != NULL && usr_callbacks->usr_gpio_write != NULL)
+	{
+		g_cmd_cbs.funcs[GPIO_CB_IDX][READ_CB_IDX] = usr_callbacks->usr_gpio_read;
+		g_cmd_cbs.funcs[GPIO_CB_IDX][WRITE_CB_IDX] = usr_callbacks->usr_gpio_write;
+		g_cmd_cbs.not_null_cbs[GPIO_CB_IDX - 1] = true;
+		++g_cmd_cbs.num_not_null_cbs;
+	}
+
+	if (usr_callbacks->usr_i2c_read != NULL && usr_callbacks->usr_i2c_write != NULL)
+	{
+		g_cmd_cbs.funcs[I2C_CB_IDX][READ_CB_IDX] = usr_callbacks->usr_i2c_read;
+		g_cmd_cbs.funcs[I2C_CB_IDX][WRITE_CB_IDX] = usr_callbacks->usr_i2c_write;
+		g_cmd_cbs.not_null_cbs[I2C_CB_IDX - 1] = true;
+		++g_cmd_cbs.num_not_null_cbs;
+	}
+}
+
 static void help_func(yacl_inout_data_t* inout_data)
 {
 	yacl_printf("\nYACL Help\n\n\t<protocol> <action> <addr> <reg> [reg end] [data]\n\n");
 
-	for (uint32_t i = 1; i <= I2C_CB_IDX; ++i)
+	for (uint32_t i = 1; i <= g_cmd_cbs.num_not_null_cbs; ++i)
 		yacl_printf("%s supports read and write\n", g_cmd_cbs.protocols[i]);
 	yacl_printf("\n");
 }

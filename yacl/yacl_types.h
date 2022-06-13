@@ -15,6 +15,11 @@ enum Buffer_Lengths {
 	TOKENS_LEN_IDX   = 15
 };
 
+enum Action_Call_Back_Index {
+	READ_CB_IDX = 0,
+	WRITE_CB_IDX = 1
+};
+
 enum Protocol_Call_Back_Indexes {
 	HELP_CB_IDX     = 0,
 	GPIO_CB_IDX     = 1,
@@ -41,9 +46,8 @@ enum Token_Count_Checks {
 };
 
 enum Lut_Array_Sizes {
-	MAX_PROTOCOLS = 4,
-	MAX_ACTIONS = 2,
-	MAX_FUNC_CBS = 3
+	NUM_PROTOCOLS = 4,
+	NUM_ACTIONS = 2,
 };
 
 typedef struct error_desc {
@@ -69,12 +73,12 @@ typedef struct data_buffer {
 } data_buffer_t;
 
 typedef struct protocol_lut_cb {
-	char* protocols[MAX_PROTOCOLS];
-	char* actions[MAX_ACTIONS];
-	cb_funcs_t* funcs[MAX_FUNC_CBS];
+	char* protocols[NUM_PROTOCOLS + 1];
+	char* actions[NUM_ACTIONS];
+	cb_funcs_t funcs[(NUM_PROTOCOLS * 2) + 1][2];
 
-	uint32_t num_protocols;
-	uint32_t num_actions;
+	bool not_null_cbs[NUM_PROTOCOLS];
+	uint32_t num_not_null_cbs;
 
 } protocol_lut_cb_t;
 

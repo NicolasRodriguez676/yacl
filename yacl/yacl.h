@@ -24,11 +24,6 @@ typedef enum yacl_error {
 
 } yacl_error_t;
 
-enum Action_Call_Back_Index {
-	READ_CB_IDX = 0,
-	WRITE_CB_IDX = 1
-};
-
 typedef int (* usr_printf_t)(const char* format, ...);
 typedef int (* usr_snprintf_t)(char* buffer, size_t count, const char* format, ...);
 
@@ -51,12 +46,13 @@ typedef void (* cb_funcs_t)(yacl_inout_data_t* inout_data);
 
 typedef struct yacl_usr_callbacks {
 	usr_print_funcs_t usr_print_funcs;
-	cb_funcs_t gpio_funcs[2];
-	cb_funcs_t i2c_funcs[2];
+
+	cb_funcs_t usr_gpio_write;
+	cb_funcs_t usr_gpio_read;
+	cb_funcs_t usr_i2c_read;
+	cb_funcs_t usr_i2c_write;
 
 } yacl_usr_callbacks_t;
-
-
 
 //      FUNCTIONS
 
