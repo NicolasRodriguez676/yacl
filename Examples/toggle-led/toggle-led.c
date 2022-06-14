@@ -14,14 +14,16 @@ int main(void)
 	HAL_SYSTICK_Config(SystemCoreClock / 1000);
 
 	yacl_usr_callbacks_t callbacks;
+	yacl_set_cb_null(&callbacks);
+
 	callbacks.usr_print_funcs.usr_printf = printf;
 	callbacks.usr_print_funcs.usr_snprintf = snprintf;
 
 	callbacks.usr_gpio_read = usr_gpio_read;
 	callbacks.usr_gpio_write = usr_gpio_write;
 
-//	callbacks.usr_i2c_read = usr_gpio_read;
-//	callbacks.usr_i2c_write = usr_gpio_write;
+	callbacks.usr_i2c_read = usr_gpio_read;
+	callbacks.usr_i2c_write = usr_gpio_write;
 	yacl_init(&callbacks);
 
 	LL_USART_EnableIT_RXNE(UART5);
@@ -44,11 +46,6 @@ void usr_gpio_write(yacl_inout_data_t* inout_data)
 
 void usr_gpio_read(yacl_inout_data_t* inout_data)
 {
-	uint32_t i = 0;
-	do
-	{
+	for (uint32_t i = 0; i < inout_data->range; ++i)
 		inout_data->bufr[i] = LL_GPIO_IsOutputPinSet(LED_PORT, LED_PIN);
-		++i;
-
-	} while (i < inout_data->beg_reg - inout_data->end_reg);
 }
