@@ -24,6 +24,8 @@ static protocol_lut_cb_t g_cmd_cbs = {
 static ring_buffer_t g_input_bufr = { .bufr = { 0 }, .head = 0, .tail = 0 };
 static data_buffer_t g_tok_bufr = { .bufr = { 0 }, .idx= 0, .tok_array= { NULL }, .tok_cnt = 0 };
 
+static bool input_bufr_ok = true;
+
 //      FUNCTION PROTOTYPES
 
 static yacl_error_t proc_in_bufr();
@@ -65,23 +67,30 @@ void yacl_init(yacl_usr_callbacks_t* usr_callbacks)
 	yacl_printf("YACL by Nick\n\nExplore peripherals connected to your MCU freely!\nType 'help' for more information or visit my GitHub\n\n>> ");
 }
 
-// TODO: make a global state variable to handle input buffer overrun error
-yacl_error_t yacl_wr_buf(char data)
+void yacl_wr_buf(char data)
 {
 	if (bufr_chk() == YACL_BUF_FULL)
 	{
-		empty_bufrs();
-		return YACL_BUFRS_EMPTD;
+		input_bufr_ok = false;
+		return;
 	}
 
 	g_input_bufr.bufr[g_input_bufr.head++ & 0x7f] = data;
-
-	return YACL_SUCCESS;
+	return;
 }
 
 yacl_error_t yacl_parse_cmd()
 {
-	yacl_error_t error = proc_in_bufr();
+	yacl_error_t error;
+
+	if (input_bufr_ok)
+		error = proc_in_bufr();
+	else
+	{
+		empty_bufrs();
+		vt100_error(yacl_error_desc(YACL_BUFRS_EMPTD));
+		return YACL_BUFRS_EMPTD;
+	}
 
 	if (error != YACL_SUCCESS)
 		return error;
@@ -336,6 +345,8 @@ static yacl_error_t bufr_chk()
 
 static void empty_bufrs()
 {
+	input_bufr_ok = true;
+
 	g_input_bufr.head = 0;
 	g_input_bufr.tail = 0;
 
