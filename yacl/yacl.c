@@ -27,7 +27,7 @@ static data_buffer_t g_tok_bufr = { .bufr = { 0 }, .idx= 0, .tok_array= { NULL }
 //      FUNCTION PROTOTYPES
 
 static yacl_error_t proc_in_bufr();
-static yacl_error_t get_comm_lut_idxs(uint32_t* protocol_idx, uint32_t* action_idx);
+static yacl_error_t get_protocol_lut_idxs(uint32_t* protocol_idx, uint32_t* action_idx);
 static bool         compare_tokens(const char* str_lhs, const char* str_rhs);
 
 static yacl_error_t bufr_chk();
@@ -44,7 +44,7 @@ static bool         check_arg_count(uint32_t action);
 static bool         conv_args_num(yacl_inout_data_t* inout_data, uint32_t action);
 static bool         get_str_value(uint32_t* data, uint32_t tok_idx);
 static uint32_t     get_prefix(const uint8_t* num_str, uint32_t num_str_size);
-static bool get_reg_range(yacl_inout_data_t* inout_data);
+static yacl_error_t get_reg_range(yacl_inout_data_t* inout_data);
 
 static void         help_func(yacl_inout_data_t* inout_data);
 static void         init_cbs(yacl_usr_callbacks_t* usr_callbacks);
@@ -65,6 +65,7 @@ void yacl_init(yacl_usr_callbacks_t* usr_callbacks)
 	vt100_yacl_view();
 }
 
+// TODO: make a global state variable to handle input buffer overrun error
 yacl_error_t yacl_wr_buf(char data)
 {
 	if (bufr_chk() == YACL_BUF_FULL)
@@ -88,13 +89,12 @@ yacl_error_t yacl_parse_cmd()
 	uint32_t protocol_idx = 0;
 	uint32_t action_idx = 0;
 
-	error = get_comm_lut_idxs(&protocol_idx, &action_idx);
+	error = get_protocol_lut_idxs(&protocol_idx, &action_idx);
 
 	if (error != YACL_SUCCESS)
 	{
 		empty_bufrs();
-		vt100_error("ERROR: Unknown command");
-		vt100_yacl_view();
+		vt100_error(yacl_error_desc(error));
 
 		return error;
 	}
@@ -113,8 +113,7 @@ yacl_error_t yacl_parse_cmd()
 	if (check_arg_count(action_idx) == false)
 	{
 		empty_bufrs();
-		vt100_error("ERROR: Missing args");
-		vt100_yacl_view();
+		vt100_error(yacl_error_desc(error));
 
 		return YACL_UNKNOWN_CMD;
 	}
@@ -126,31 +125,30 @@ yacl_error_t yacl_parse_cmd()
 
 	if (g_cmd_cbs.not_null_cbs[protocol_idx])
 	{
-		if (get_reg_range(&inout_data))
+		if (get_reg_range(&inout_data) == YACL_SUCCESS)
 			g_cmd_cbs.funcs[protocol_idx][action_idx](&inout_data);
 		else
 		{
 			empty_bufrs();
-			vt100_yacl_view();
+			vt100_error(yacl_error_desc(YACL_INOUT_BUFR));
+
 			return YACL_UNKNOWN_CMD;
 		}
 	}
 	else
 	{
-		yacl_printf("%s was not provided a callback function\n\n", g_cmd_cbs.protocols[protocol_idx]);
 		empty_bufrs();
-		vt100_yacl_view();
+		vt100_error(yacl_error_desc(YACL_NO_CALLBACK));
+
 		return YACL_UNKNOWN_CMD;
 	}
 
 	if (action_idx == READ_CB_IDX)
 	{
-		uint32_t start;
+		uint32_t start = inout_data.beg_reg;
 
 		if (inout_data.beg_reg > inout_data.end_reg)
 			start = inout_data.end_reg;
-		else // if (inout_data.beg_reg < inout_data.end_reg)
-			start = inout_data.beg_reg;
 
 		yacl_printf("\n");
 		for (uint32_t i = 0; i < inout_data.range; ++i)
@@ -181,7 +179,13 @@ const char* yacl_error_desc(yacl_error_t error)
 		{ YACL_UNKNOWN_CMD,     "command was not found in given commands"   },
 		{ YACL_NO_CMD,          "command incomplete"                        },
 		{ YACL_BUF_FULL,        "buffer full. try emptying buffer"          },
-		{ YACL_BUFRS_EMPTD,     "buffers emptied"                           }
+		{ YACL_BUFRS_EMPTD,     "buffers emptied"                           },
+		{ YACL_ARG_OVRN,        "arg was too long. max 14 characters"       },
+		{ YACL_TOO_MANY_ARGS,   "command has too many args"                 },
+		{ YACL_NOT_ENUF_ARGS,   "command missing args"                      },
+		{ YACL_INVALID_ARG,     "invalid arg"                               },
+		{ YACL_INOUT_BUFR,      "register range greater than inout buffer"  },
+		{ YACL_NO_CALLBACK,     "command was not given a callback function" },
 	};
 
 	return error_desc[error].msg;
@@ -215,9 +219,7 @@ static yacl_error_t proc_in_bufr()
 			if (g_tok_bufr.tok_cnt >= MAX_TOKENS)
 			{
 				empty_bufrs();
-
-				vt100_error("ERROR: Too many tokens");
-				vt100_yacl_view();
+				vt100_error(yacl_error_desc(YACL_TOO_MANY_ARGS));
 
 				return YACL_BUFRS_EMPTD;
 			}
@@ -261,9 +263,7 @@ static yacl_error_t proc_in_bufr()
 			else
 			{
 				empty_bufrs();
-
-				vt100_error("ERROR: Token overrun");
-				vt100_yacl_view();
+				vt100_error(yacl_error_desc(YACL_ARG_OVRN));
 
 				return YACL_BUFRS_EMPTD;
 			}
@@ -275,7 +275,7 @@ static yacl_error_t proc_in_bufr()
 	return YACL_NO_CMD;
 }
 
-static yacl_error_t get_comm_lut_idxs(uint32_t* protocol_idx, uint32_t* action_idx)
+static yacl_error_t get_protocol_lut_idxs(uint32_t* protocol_idx, uint32_t* action_idx)
 {
 	bool token_is_valid = false;
 
@@ -450,11 +450,11 @@ static bool get_str_value(uint32_t* data, uint32_t tok_idx)
 
 	for (; i < g_tok_bufr.tok_array[tok_idx][TOKENS_LEN_IDX]; ++i)
 	{
-		if (!isdigit(g_tok_bufr.tok_array[tok_idx][i]))
+		if (!isxdigit(g_tok_bufr.tok_array[tok_idx][i]))
 		{
 			empty_bufrs();
-			yacl_printf("\nERROR: Invalid value for arg[%u]\n\n", tok_idx + 1);
-			vt100_yacl_view();
+			vt100_error_data(yacl_error_desc(YACL_INVALID_ARG), tok_idx + 1);
+
 			return false;
 		}
 	}
@@ -463,8 +463,7 @@ static bool get_str_value(uint32_t* data, uint32_t tok_idx)
 	if (check_result == ULONG_MAX)
 	{
 		empty_bufrs();
-		yacl_printf("\nERROR: arg[%u] is too large\n\n", tok_idx + 1);
-		vt100_yacl_view();
+		vt100_error_data(yacl_error_desc(YACL_INVALID_ARG), tok_idx + 1);
 
 		return false;
 	}
@@ -474,22 +473,19 @@ static bool get_str_value(uint32_t* data, uint32_t tok_idx)
 	return true;
 }
 
-bool get_reg_range(yacl_inout_data_t* inout_data)
+yacl_error_t get_reg_range(yacl_inout_data_t* inout_data)
 {
 	if (inout_data->beg_reg > inout_data->end_reg)
 		inout_data->range = (inout_data->beg_reg - inout_data->end_reg) + 1;
 	else if (inout_data->beg_reg < inout_data->end_reg)
 		inout_data->range = (inout_data->end_reg - inout_data->beg_reg) + 1;
 	else
-		inout_data->range = 0;
+		inout_data->range = 1;
 
 	if (inout_data->range > INOUT_BUFR_LEN)
-	{
-		vt100_error("ERROR:: Increase inout buffer size");
-		return false;
-	}
+		return YACL_INOUT_BUFR;
 
-	return true;
+	return YACL_SUCCESS;
 }
 
 static uint32_t get_prefix(const uint8_t* num_str, uint32_t num_str_size)

@@ -25,7 +25,16 @@ void vt100_yacl_view()
 
 void vt100_error(const char* error_str)
 {
-	yacl_printf("\n%s\n\n", error_str);
+	yacl_printf("\nERROR:: %s\n\n", error_str);
+
+	vt100_yacl_view();
+}
+
+void vt100_error_data(const char* error_str, uint32_t error_data)
+{
+	yacl_printf("\nERROR:: %s - %d\n\n", error_str, error_data);
+
+	vt100_yacl_view();
 }
 
 void vt100_backspace()
