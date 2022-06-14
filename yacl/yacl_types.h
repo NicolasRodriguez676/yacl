@@ -16,7 +16,7 @@ enum Buffer_Lengths {
 };
 
 enum Action_Call_Back_Index {
-	READ_CB_IDX = 0,
+	READ_CB_IDX  = 0,
 	WRITE_CB_IDX = 1
 };
 
@@ -47,7 +47,7 @@ enum Token_Count_Checks {
 
 enum Lut_Array_Sizes {
 	NUM_PROTOCOLS = 4,
-	NUM_ACTIONS = 2,
+	NUM_ACTIONS   = 2,
 };
 
 typedef struct error_desc {

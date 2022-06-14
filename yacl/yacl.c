@@ -22,7 +22,7 @@ static protocol_lut_cb_t g_cmd_cbs = {
 };
 
 static ring_buffer_t g_input_bufr = { .bufr = { 0 }, .head = 0, .tail = 0 };
-static data_buffer_t g_tok_bufr = { .bufr = { 0 }, .idx= 0, .tok_array= { NULL }, .tok_cnt = 0 };
+static data_buffer_t g_tok_bufr = { .bufr = { 0 }, .idx = 0, .tok_array= { NULL }, .tok_cnt = 0 };
 
 static bool input_bufr_ok = true;
 
@@ -373,7 +373,6 @@ static void pop_token()
 
 static void null_term_token()
 {
-//	g_tok_bufr.tok_array[g_tok_bufr.tok_cnt][TOKENS_LEN_IDX] = g_tok_bufr.idx;
 	g_tok_bufr.tok_array[g_tok_bufr.tok_cnt][TOKENS_LEN_IDX] = g_tok_bufr.idx + 1;
 	g_tok_bufr.tok_array[g_tok_bufr.tok_cnt][g_tok_bufr.idx] = '\0';
 }
