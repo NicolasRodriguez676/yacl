@@ -362,7 +362,8 @@ static void pop_token()
 
 static void null_term_token()
 {
-	g_tok_bufr.tok_array[g_tok_bufr.tok_cnt][TOKENS_LEN_IDX] = g_tok_bufr.idx;
+//	g_tok_bufr.tok_array[g_tok_bufr.tok_cnt][TOKENS_LEN_IDX] = g_tok_bufr.idx;
+	g_tok_bufr.tok_array[g_tok_bufr.tok_cnt][TOKENS_LEN_IDX] = g_tok_bufr.idx + 1;
 	g_tok_bufr.tok_array[g_tok_bufr.tok_cnt][g_tok_bufr.idx] = '\0';
 }
 
@@ -448,7 +449,7 @@ static bool get_str_value(uint32_t* data, uint32_t tok_idx)
 	if (base == 16)
 		i = 2;
 
-	for (; i < g_tok_bufr.tok_array[tok_idx][TOKENS_LEN_IDX]; ++i)
+	for (; i < g_tok_bufr.tok_array[tok_idx][TOKENS_LEN_IDX] - 1; ++i)
 	{
 		if (!isxdigit(g_tok_bufr.tok_array[tok_idx][i]))
 		{
