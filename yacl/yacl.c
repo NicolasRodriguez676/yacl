@@ -62,7 +62,7 @@ void yacl_init(yacl_usr_callbacks_t* usr_callbacks)
 		g_tok_bufr.tok_array[i] = g_tok_bufr.bufr + (MAX_TOKEN_LEN * i);
 
 	vt100_rst_term();
-	vt100_yacl_view();
+	yacl_printf("YACL by Nick\n\nExplore peripherals connected to your MCU freely!\nType 'help' for more information or visit my GitHub\n\n>> ");
 }
 
 // TODO: make a global state variable to handle input buffer overrun error
