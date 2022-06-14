@@ -44,9 +44,10 @@ static bool         check_arg_count(uint32_t action);
 static bool         conv_args_num(yacl_inout_data_t* inout_data, uint32_t action);
 static bool         get_str_value(uint32_t* data, uint32_t tok_idx);
 static uint32_t     get_prefix(const uint8_t* num_str, uint32_t num_str_size);
+static void         get_reg_range(yacl_inout_data_t* inout_data);
 
-static void         init_cbs(yacl_usr_callbacks_t* usr_callbacks);
 static void         help_func(yacl_inout_data_t* inout_data);
+static void         init_cbs(yacl_usr_callbacks_t* usr_callbacks);
 
 //      PUBLIC      ****************************************************************************************************
 
@@ -124,7 +125,10 @@ yacl_error_t yacl_parse_cmd()
 		return YACL_UNKNOWN_CMD;
 
 	if (g_cmd_cbs.not_null_cbs[protocol_idx])
+	{
+		get_reg_range(&inout_data);
 		g_cmd_cbs.funcs[protocol_idx][action_idx](&inout_data);
+	}
 	else
 	{
 		yacl_printf("%s was not provided a callback function\n\n", g_cmd_cbs.protocols[protocol_idx]);
@@ -135,13 +139,17 @@ yacl_error_t yacl_parse_cmd()
 
 	if (action_idx == READ_CB_IDX)
 	{
-		uint32_t i = 0;
-		do
-		{
-			yacl_printf("%s love level: %d\n", g_cmd_cbs.protocols[protocol_idx], inout_data.bufr[i]);
-			++i;
+		uint32_t start;
 
-		} while (i < inout_data.beg_reg - inout_data.end_reg);
+		if (inout_data.beg_reg > inout_data.end_reg)
+			start = inout_data.end_reg;
+		else // if (inout_data.beg_reg < inout_data.end_reg)
+			start = inout_data.beg_reg;
+
+		yacl_printf("\n");
+		for (uint32_t i = 0; i < inout_data.range; ++i)
+			yacl_printf("0x%04x  ::  %d\n", start + i, inout_data.bufr[i]);
+
 		yacl_printf("\n");
 	}
 
@@ -401,9 +409,10 @@ static bool conv_args_num(yacl_inout_data_t* inout_data, uint32_t action)
 		{
 			if (get_str_value(&inout_data->end_reg, ARG_END_REG_IDX) == false)
 				return false;
+			return true;
 		}
 
-		inout_data->end_reg = 0;
+		inout_data->end_reg = inout_data->beg_reg;
 		return true;
 	}
 	else // if (action == WRITE_CB_IDX)
@@ -417,7 +426,7 @@ static bool conv_args_num(yacl_inout_data_t* inout_data, uint32_t action)
 			return true;
 		}
 
-		inout_data->end_reg = 0;
+		inout_data->end_reg = inout_data->beg_reg;
 		if (get_str_value(&inout_data->data, ARG_DATA0_IDX) == false)
 			return false;
 		return true;
@@ -457,6 +466,19 @@ static bool get_str_value(uint32_t* data, uint32_t tok_idx)
 	*data = check_result;
 
 	return true;
+}
+
+void get_reg_range(yacl_inout_data_t* inout_data)
+{
+	if (inout_data->beg_reg > inout_data->end_reg)
+		inout_data->range = (inout_data->beg_reg - inout_data->end_reg) + 1;
+	else if (inout_data->beg_reg < inout_data->end_reg)
+		inout_data->range = (inout_data->end_reg - inout_data->beg_reg) + 1;
+	else
+		inout_data->range = 0;
+
+	if (inout_data->range > INOUT_BUFR_LEN)
+		yacl_printf("\nERROR:: Increase inout buffer size\n");
 }
 
 static uint32_t get_prefix(const uint8_t* num_str, uint32_t num_str_size)

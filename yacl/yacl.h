@@ -4,8 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-enum Inout_Buffer_size{
-
+enum Inout_Buffer_size {
 #ifdef YACL_USR_INOUT_BFR_LEN
 	INOUT_BUFR_LEN = YACL_USR_INOUT_BFR_LEN
 #else
@@ -39,6 +38,7 @@ typedef struct yacl_inout_data {
 	uint32_t addr;
 	uint32_t beg_reg;
 	uint32_t end_reg;
+	uint32_t range;
 
 } yacl_inout_data_t;
 
