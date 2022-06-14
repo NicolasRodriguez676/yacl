@@ -21,9 +21,9 @@ enum Action_Call_Back_Index {
 };
 
 enum Protocol_Call_Back_Indexes {
-	HELP_CB_IDX     = 0,
-	GPIO_CB_IDX     = 1,
-	I2C_CB_IDX      = 2,
+	GPIO_CB_IDX     = 0,
+	I2C_CB_IDX      = 1,
+	HELP_CB_IDX     = 2,
 };
 
 enum Token_Arg_Indexes {

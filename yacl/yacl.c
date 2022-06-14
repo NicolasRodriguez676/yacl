@@ -14,9 +14,9 @@ usr_printf_t yacl_printf;
 usr_snprintf_t yacl_snprintf;
 
 static protocol_lut_cb_t g_cmd_cbs = {
-	.protocols = { "help", "gpio", "i2c" },
+	.protocols = { "gpio", "i2c", "help" },
 	.actions = { "read", "write" },
-	.funcs = {{ NULL, NULL }},
+	.funcs = { { NULL, NULL } },
 	.not_null_cbs = { false },
 	.num_not_null_cbs = 0
 };
@@ -149,6 +149,15 @@ yacl_error_t yacl_parse_cmd()
 	vt100_yacl_view();
 
 	return YACL_SUCCESS;
+}
+
+void yacl_set_cb_null(yacl_usr_callbacks_t* usr_callbacks)
+{
+	usr_callbacks->usr_gpio_read = NULL;
+	usr_callbacks->usr_gpio_write = NULL;
+
+	usr_callbacks->usr_i2c_read = NULL;
+	usr_callbacks->usr_i2c_write = NULL;
 }
 
 const char* yacl_error_desc(yacl_error_t error)
@@ -463,19 +472,21 @@ void init_cbs(yacl_usr_callbacks_t* usr_callbacks)
 	g_cmd_cbs.funcs[HELP_CB_IDX][0] = help_func;
 //	g_cmd_cbs.funcs[HELP_CB_IDX][1] = help_func;
 
-	if (usr_callbacks->usr_gpio_read != NULL && usr_callbacks->usr_gpio_write != NULL)
+	if (usr_callbacks->usr_gpio_read && usr_callbacks->usr_gpio_write)
 	{
 		g_cmd_cbs.funcs[GPIO_CB_IDX][READ_CB_IDX] = usr_callbacks->usr_gpio_read;
 		g_cmd_cbs.funcs[GPIO_CB_IDX][WRITE_CB_IDX] = usr_callbacks->usr_gpio_write;
-		g_cmd_cbs.not_null_cbs[GPIO_CB_IDX - 1] = true;
+
+		g_cmd_cbs.not_null_cbs[GPIO_CB_IDX] = true;
 		++g_cmd_cbs.num_not_null_cbs;
 	}
 
-	if (usr_callbacks->usr_i2c_read != NULL && usr_callbacks->usr_i2c_write != NULL)
+	if (usr_callbacks->usr_i2c_read && usr_callbacks->usr_i2c_write)
 	{
 		g_cmd_cbs.funcs[I2C_CB_IDX][READ_CB_IDX] = usr_callbacks->usr_i2c_read;
 		g_cmd_cbs.funcs[I2C_CB_IDX][WRITE_CB_IDX] = usr_callbacks->usr_i2c_write;
-		g_cmd_cbs.not_null_cbs[I2C_CB_IDX - 1] = true;
+
+		g_cmd_cbs.not_null_cbs[I2C_CB_IDX] = true;
 		++g_cmd_cbs.num_not_null_cbs;
 	}
 }

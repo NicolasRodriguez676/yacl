@@ -60,7 +60,8 @@ void yacl_init(yacl_usr_callbacks_t* usr_callbacks);
 
 yacl_error_t yacl_parse_cmd();
 yacl_error_t yacl_wr_buf(char data);
+void         yacl_set_cb_null(yacl_usr_callbacks_t* usr_callbacks);
 
-const char* yacl_error_desc(yacl_error_t error);
+const char*  yacl_error_desc(yacl_error_t error);
 
 #endif //_YACL_H_
