@@ -44,7 +44,7 @@ static bool         check_arg_count(uint32_t action);
 static bool         conv_args_num(yacl_inout_data_t* inout_data, uint32_t action);
 static bool         get_str_value(uint32_t* data, uint32_t tok_idx);
 static uint32_t     get_prefix(const uint8_t* num_str, uint32_t num_str_size);
-static void         get_reg_range(yacl_inout_data_t* inout_data);
+static bool get_reg_range(yacl_inout_data_t* inout_data);
 
 static void         help_func(yacl_inout_data_t* inout_data);
 static void         init_cbs(yacl_usr_callbacks_t* usr_callbacks);
@@ -126,8 +126,14 @@ yacl_error_t yacl_parse_cmd()
 
 	if (g_cmd_cbs.not_null_cbs[protocol_idx])
 	{
-		get_reg_range(&inout_data);
-		g_cmd_cbs.funcs[protocol_idx][action_idx](&inout_data);
+		if (get_reg_range(&inout_data))
+			g_cmd_cbs.funcs[protocol_idx][action_idx](&inout_data);
+		else
+		{
+			empty_bufrs();
+			vt100_yacl_view();
+			return YACL_UNKNOWN_CMD;
+		}
 	}
 	else
 	{
@@ -468,7 +474,7 @@ static bool get_str_value(uint32_t* data, uint32_t tok_idx)
 	return true;
 }
 
-void get_reg_range(yacl_inout_data_t* inout_data)
+bool get_reg_range(yacl_inout_data_t* inout_data)
 {
 	if (inout_data->beg_reg > inout_data->end_reg)
 		inout_data->range = (inout_data->beg_reg - inout_data->end_reg) + 1;
@@ -478,7 +484,12 @@ void get_reg_range(yacl_inout_data_t* inout_data)
 		inout_data->range = 0;
 
 	if (inout_data->range > INOUT_BUFR_LEN)
-		yacl_printf("\nERROR:: Increase inout buffer size\n");
+	{
+		vt100_error("ERROR:: Increase inout buffer size");
+		return false;
+	}
+
+	return true;
 }
 
 static uint32_t get_prefix(const uint8_t* num_str, uint32_t num_str_size)
@@ -517,7 +528,7 @@ static void help_func(yacl_inout_data_t* inout_data)
 {
 	yacl_printf("\nYACL Help\n\n\t<protocol> <action> <addr> <reg> [reg end] [data]\n\n");
 
-	for (uint32_t i = 1; i <= g_cmd_cbs.num_not_null_cbs; ++i)
+	for (uint32_t i = 0; i < g_cmd_cbs.num_not_null_cbs; ++i)
 		yacl_printf("%s supports read and write\n", g_cmd_cbs.protocols[i]);
 	yacl_printf("\n");
 }
