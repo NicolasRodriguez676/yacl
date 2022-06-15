@@ -486,7 +486,7 @@ static bool get_str_value(uint32_t* data, uint32_t tok_idx)
 	uint32_t base = get_prefix(g_tok_bufr.tok_array[tok_idx]);
 	char* end_ptr = (char*)(g_tok_bufr.tok_array[tok_idx] + g_tok_bufr.tok_array[tok_idx][TOKENS_LEN_IDX]);
 
-	uint32_t i = 0;
+	uint8_t i = 0;
 
 	if (base == 16)
 		i = 2;
