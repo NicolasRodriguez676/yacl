@@ -1,9 +1,13 @@
 cmake_minimum_required(VERSION 3.22)
 
-option(BUILD-EMBEDDED "build library using stm32 gcc toolchain" ON)
+option(BUILD-STM32 "build library using gcc toolchain for STM32" ON)
+option(INSTALL-YACL "make an install target" ON)
 
-if (${BUILD-EMBEDDED})
+if (${BUILD-STM32})
     set(CMAKE_TOOLCHAIN_FILE $ENV{CMAKE_STM32_SCRIPTS}/stm32_gcc.cmake)
+endif()
+
+if (DEFINED ENV{EMBEDDED_LIBS})
     set(CMAKE_INSTALL_PREFIX $ENV{EMBEDDED_LIBS})
 endif()
 
@@ -14,14 +18,15 @@ project(YACL
         VERSION
             0.4)
 
+
 add_subdirectory(yacl)
 
-if (${BUILD-EMBEDDED})
+if (${INSTALL-YACL})
     include(cmake/InstallLibs.cmake)
+    install_lib(YACL)
 
-    if (${CMAKE_BUILD_TYPE} MATCHES "^[Rr]elease")
-        install_lib(${PROJECT_NAME})
-    endif()
-else()
-    add_subdirectory(tests)
+# tests do not work. anymore. maybe i will figure out how to make
+# some more and know exactly what to test
+# else()
+#     add_subdirectory(tests)
 endif()

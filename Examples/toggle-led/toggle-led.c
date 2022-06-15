@@ -17,7 +17,7 @@ int main(void)
 	yacl_set_cb_null(&callbacks);
 
 	callbacks.usr_print_funcs.usr_printf = printf;
-	callbacks.usr_print_funcs.usr_snprintf = snprintf;
+//	callbacks.usr_print_funcs.usr_snprintf = snprintf;
 
 	callbacks.usr_gpio_read = usr_gpio_read;
 	callbacks.usr_gpio_write = usr_gpio_write;

@@ -1,2 +1,6 @@
 get_filename_component(CURRENT_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
-include(${CURRENT_DIR}/Release/YACL.cmake)
+include(${CURRENT_DIR}/Release/YACL.cmake OPTIONAL RESULT_VARIABLE CORRECT_BUILD_TYPE)
+
+if (${CORRECT_BUILD_TYPE} STREQUAL "NOTFOUND")
+    include(${CURRENT_DIR}/Debug/YACL.cmake)
+endif()
