@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+// for extracting more than default number of consecutive register data,
+// define this macro using CMake
 enum Inout_Buffer_size {
 #ifdef YACL_USR_INOUT_BFR_LEN
 	INOUT_BUFR_LEN = YACL_USR_INOUT_BFR_LEN
@@ -30,11 +32,11 @@ typedef enum yacl_error {
 } yacl_error_t;
 
 typedef int (* usr_printf_t)(const char* format, ...);
-typedef int (* usr_snprintf_t)(char* buffer, size_t count, const char* format, ...);
+//typedef int (* usr_snprintf_t)(char* buffer, size_t count, const char* format, ...);
 
 typedef struct usr_print_funcs {
 	usr_printf_t usr_printf;
-	usr_snprintf_t usr_snprintf;
+//	usr_snprintf_t usr_snprintf;
 
 } usr_print_funcs_t;
 

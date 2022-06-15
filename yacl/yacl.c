@@ -11,7 +11,7 @@
 //      GLOBALS
 
 usr_printf_t yacl_printf;
-usr_snprintf_t yacl_snprintf;
+//usr_snprintf_t yacl_snprintf;
 
 static protocol_lut_cb_t g_cmd_cbs = {
 	.protocols = { "gpio", "i2c", "help" },
@@ -45,7 +45,7 @@ static void         rm_from_token(bool dec_idx);
 static bool         check_arg_count(uint32_t action);
 static bool         conv_args_num(yacl_inout_data_t* inout_data, uint32_t action);
 static bool         get_str_value(uint32_t* data, uint32_t tok_idx);
-static uint32_t     get_prefix(const uint8_t* num_str, uint32_t num_str_size);
+static uint32_t get_prefix(const uint8_t* num_str);
 static yacl_error_t get_reg_range(yacl_inout_data_t* inout_data);
 
 static void         help_func(yacl_inout_data_t* inout_data);
@@ -55,20 +55,30 @@ static void         init_cbs(yacl_usr_callbacks_t* usr_callbacks);
 
 void yacl_init(yacl_usr_callbacks_t* usr_callbacks)
 {
+	// assume user provides valid printf functions
 	yacl_printf = usr_callbacks->usr_print_funcs.usr_printf;
-	yacl_snprintf = usr_callbacks->usr_print_funcs.usr_snprintf;
+//	yacl_snprintf = usr_callbacks->usr_print_funcs.usr_snprintf;
 
+	// initialize callbacks into protocol lookup table
+	// record non-null callbacks as valid
 	init_cbs(usr_callbacks);
 
+	// allocate token space in static global buffer
+	// easier buffer + token management
 	for (uint32_t i = 0; i < MAX_TOKENS; ++i)
 		g_tok_bufr.tok_array[i] = g_tok_bufr.bufr + (MAX_TOKEN_LEN * i);
 
+	// clear the VT100 terminal screen
 	vt100_rst_term();
+
+	// display welcome message
 	yacl_printf("YACL by Nick\n\nExplore peripherals connected to your MCU freely!\nType 'help' for more information or visit my GitHub\n\n>> ");
 }
 
 void yacl_wr_buf(char data)
 {
+	// check if input buffer has enough space
+	// if not then flag buffer to be erased later
 	if (bufr_chk() == YACL_BUF_FULL)
 	{
 		input_bufr_ok = false;
@@ -87,11 +97,13 @@ yacl_error_t yacl_parse_cmd()
 		error = proc_in_bufr();
 	else
 	{
+		// erase buffers if input buffer overrun
 		empty_bufrs();
 		vt100_error(yacl_error_desc(YACL_BUFRS_EMPTD));
 		return YACL_BUFRS_EMPTD;
 	}
 
+	// if process buffer is not complete, return. Normally means '\n' has not been received
 	if (error != YACL_SUCCESS)
 		return error;
 
@@ -108,6 +120,7 @@ yacl_error_t yacl_parse_cmd()
 		return error;
 	}
 
+	// prevent extraction of non-present numerical arguments for help function
 	if (protocol_idx == HELP_CB_IDX && g_tok_bufr.tok_cnt == 1)
 	{
 		yacl_inout_data_t inout_data;
@@ -119,6 +132,7 @@ yacl_error_t yacl_parse_cmd()
 		return YACL_SUCCESS;
 	}
 
+	// read and write have different minimum args
 	if (check_arg_count(action_idx) == false)
 	{
 		empty_bufrs();
@@ -129,12 +143,18 @@ yacl_error_t yacl_parse_cmd()
 
 	yacl_inout_data_t inout_data;
 
+	// extract numerical arguments and save them
 	if(!conv_args_num(&inout_data, action_idx))
 		return YACL_UNKNOWN_CMD;
 
+	// check if protocol callback function is not NULL
 	if (g_cmd_cbs.not_null_cbs[protocol_idx])
 	{
-		if (get_reg_range(&inout_data) == YACL_SUCCESS)
+		// verify register range for static inout_data_t buffer
+		// action index for read is zero and write is one
+		// OR allows bypassing inout buffer range, while still
+		// calculating range for write operation
+		if (get_reg_range(&inout_data) == YACL_SUCCESS || action_idx)
 			g_cmd_cbs.funcs[protocol_idx][action_idx](&inout_data);
 		else
 		{
@@ -154,6 +174,8 @@ yacl_error_t yacl_parse_cmd()
 
 	if (action_idx == READ_CB_IDX)
 	{
+		// display read values from smaller address to large address, always
+		// otherwise, display one value
 		uint32_t start = inout_data.beg_reg;
 
 		if (inout_data.beg_reg > inout_data.end_reg)
@@ -174,6 +196,9 @@ yacl_error_t yacl_parse_cmd()
 
 void yacl_set_cb_null(yacl_usr_callbacks_t* usr_callbacks)
 {
+	// help users choose only what they want in their build of this program
+	// reduces upkeep in their program and visual clutter
+
 	usr_callbacks->usr_gpio_read = NULL;
 	usr_callbacks->usr_gpio_write = NULL;
 
@@ -204,6 +229,7 @@ const char* yacl_error_desc(yacl_error_t error)
 
 static yacl_error_t proc_in_bufr()
 {
+	// ignore leading and consecutive backspaces
 	static uint8_t prev_data = DELIM_SPACE;
 
 	uint32_t num_new_bytes = g_input_bufr.head - g_input_bufr.tail;
@@ -288,6 +314,7 @@ static yacl_error_t get_protocol_lut_idxs(uint32_t* protocol_idx, uint32_t* acti
 {
 	bool token_is_valid = false;
 
+	// find index of protocol functions that matches protocol argument
 	for ( ; *protocol_idx < NUM_PROTOCOLS; ++*protocol_idx)
 	{
 		token_is_valid = compare_tokens(g_cmd_cbs.protocols[*protocol_idx], (char*)g_tok_bufr.tok_array[ARG_PROTOCOL_IDX], ARG_PROTOCOL_IDX);
@@ -296,11 +323,14 @@ static yacl_error_t get_protocol_lut_idxs(uint32_t* protocol_idx, uint32_t* acti
 			break;
 	}
 
+	// end early if protocol index is equal to help index
+	// only one argument should be typed for the help command
 	if (!token_is_valid && *protocol_idx != HELP_CB_IDX)
 		return YACL_UNKNOWN_CMD;
 	else if (*protocol_idx == HELP_CB_IDX)
 		return YACL_SUCCESS;
 
+	// find index of action function that matches action argument
 	for ( ; *action_idx < NUM_ACTIONS; ++*action_idx)
 	{
 		token_is_valid = compare_tokens(g_cmd_cbs.actions[*action_idx], (char*)g_tok_bufr.tok_array[ARG_ACTION_IDX], ARG_ACTION_IDX);
@@ -453,14 +483,15 @@ static bool conv_args_num(yacl_inout_data_t* inout_data, uint32_t action)
 
 static bool get_str_value(uint32_t* data, uint32_t tok_idx)
 {
-	uint32_t base = get_prefix(g_tok_bufr.tok_array[tok_idx], g_tok_bufr.tok_array[tok_idx][TOKENS_LEN_IDX]);
-	char * end_ptr = (char*)(g_tok_bufr.tok_array[tok_idx] + g_tok_bufr.tok_array[tok_idx][TOKENS_LEN_IDX]);
+	uint32_t base = get_prefix(g_tok_bufr.tok_array[tok_idx]);
+	char* end_ptr = (char*)(g_tok_bufr.tok_array[tok_idx] + g_tok_bufr.tok_array[tok_idx][TOKENS_LEN_IDX]);
 
 	uint32_t i = 0;
+
 	if (base == 16)
 		i = 2;
 
-	for (; i < g_tok_bufr.tok_array[tok_idx][TOKENS_LEN_IDX] - 1; ++i)
+	for ( ; i < g_tok_bufr.tok_array[tok_idx][TOKENS_LEN_IDX] - 1; ++i)
 	{
 		if (!isxdigit(g_tok_bufr.tok_array[tok_idx][i]))
 		{
@@ -485,7 +516,7 @@ static bool get_str_value(uint32_t* data, uint32_t tok_idx)
 	return true;
 }
 
-yacl_error_t get_reg_range(yacl_inout_data_t* inout_data)
+static yacl_error_t get_reg_range(yacl_inout_data_t* inout_data)
 {
 	if (inout_data->beg_reg > inout_data->end_reg)
 		inout_data->range = (inout_data->beg_reg - inout_data->end_reg) + 1;
@@ -500,7 +531,7 @@ yacl_error_t get_reg_range(yacl_inout_data_t* inout_data)
 	return YACL_SUCCESS;
 }
 
-static uint32_t get_prefix(const uint8_t* num_str, uint32_t num_str_size)
+static uint32_t get_prefix(const uint8_t* num_str)
 {
 	if (num_str[0] == '0' && (num_str[1] == 'x' || num_str[1] == 'X') )
 		return 16;
@@ -508,7 +539,7 @@ static uint32_t get_prefix(const uint8_t* num_str, uint32_t num_str_size)
 		return 10;
 }
 
-void init_cbs(yacl_usr_callbacks_t* usr_callbacks)
+static void init_cbs(yacl_usr_callbacks_t* usr_callbacks)
 {
 	g_cmd_cbs.funcs[HELP_CB_IDX][0] = help_func;
 //	g_cmd_cbs.funcs[HELP_CB_IDX][1] = help_func;
@@ -534,9 +565,9 @@ void init_cbs(yacl_usr_callbacks_t* usr_callbacks)
 
 static void help_func(yacl_inout_data_t* inout_data)
 {
-	yacl_printf("\nYACL Help\n\n\t<protocol> <action> <addr> <reg> [reg end] [data]\n\n");
+	yacl_printf("\nYACL Help\n\n\t<protocol> <action> <addr> <reg> [optional reg end] [data]\n\n");
 
 	for (uint32_t i = 0; i < g_cmd_cbs.num_not_null_cbs; ++i)
-		yacl_printf("%s supports read and write\n", g_cmd_cbs.protocols[i]);
+		yacl_printf("  %s :: read + write\n", g_cmd_cbs.protocols[i]);
 	yacl_printf("\n");
 }
