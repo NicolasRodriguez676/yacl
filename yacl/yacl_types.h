@@ -5,6 +5,7 @@
 enum Control_Characters {
 	DELIM_SPACE         = 32,
 	DELIM_NEWLINE       = 10,
+	DELIM_CRETURN       = 13,
 	CNTRL_BACKSPACE     = 8,
 };
 

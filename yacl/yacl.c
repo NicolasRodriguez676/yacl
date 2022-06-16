@@ -85,6 +85,9 @@ void yacl_wr_buf(char data)
 		return;
 	}
 
+	if (data == DELIM_CRETURN)
+		return;
+
 	g_input_bufr.bufr[g_input_bufr.head++ & 0x7f] = data;
 	return;
 }
