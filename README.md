@@ -1,12 +1,10 @@
 # About
-***
 Yet Another Command Line (Program)
 
 This program lets you write simple commands in a VT100 terminal to execute reads and writes to various
 external devices over their respective protocols.
 
 ## Requirements 
-***
 Built and tested only with STM32 & WIN10
 
 * CMake >= 3.16*
@@ -19,7 +17,6 @@ Built and tested only with STM32 & WIN10
 ###### \* I used the default value CLion ships with. Minimum requirement comes from ObKo's cmake scripts
 
 ## Build System
-***
 YACL is its own static library that can be installed or compiled within your project as a CMake subdirectory.
 
 ### CMake Environment Variables
@@ -35,7 +32,6 @@ YACL is its own static library that can be installed or compiled within your pro
 ###### \* I do not like the idea of installing in the default path, which requires admin permissions on Windows
 
 ## Usage
-***
 #### CMake Install
 1. configure compile options to suit your target MCU 
 2. run install target in YACL project
@@ -100,7 +96,6 @@ yacl_init(&callbacks);
 * Properly tested (do not try them, they will not work)
 
 ### Future Goals
-***
 * I want to implement various forms of plotting. Eventually real time plotting. (A major reason I bothered with VT100 escape sequences, other than backspace)
 * Redesign YACL with a proper statemachine
 * More keyboard support for arrow keys
