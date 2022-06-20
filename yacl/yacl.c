@@ -29,7 +29,7 @@ static bool input_bufr_ok = true;
 
 static yacl_error_t proc_in_bufr();
 static yacl_error_t get_protocol_lut_idxs(uint32_t* protocol_idx, uint32_t* action_idx);
-static bool         compare_tokens(const char* str_lhs, const char* str_rhs, uint32_t tok_idx);
+static bool         compare_tokens(const char *str_lhs, const char *str_rhs);
 
 static yacl_error_t bufr_chk();
 static void         empty_bufrs();
@@ -318,7 +318,7 @@ static yacl_error_t get_protocol_lut_idxs(uint32_t* protocol_idx, uint32_t* acti
     // find index of protocol functions that matches protocol argument
     for ( ; *protocol_idx < NUM_PROTOCOLS; ++*protocol_idx)
     {
-        token_is_valid = compare_tokens(g_cmd_cbs.protocols[*protocol_idx], (char*)g_tok_bufr.tok_array[ARG_PROTOCOL_IDX], ARG_PROTOCOL_IDX);
+        token_is_valid = compare_tokens(g_cmd_cbs.protocols[*protocol_idx],(char *) g_tok_bufr.tok_array[ARG_PROTOCOL_IDX]);
 
         if (token_is_valid)
             break;
@@ -334,7 +334,7 @@ static yacl_error_t get_protocol_lut_idxs(uint32_t* protocol_idx, uint32_t* acti
     // find index of action function that matches action argument
     for ( ; *action_idx < NUM_ACTIONS; ++*action_idx)
     {
-        token_is_valid = compare_tokens(g_cmd_cbs.actions[*action_idx], (char*)g_tok_bufr.tok_array[ARG_ACTION_IDX], ARG_ACTION_IDX);
+        token_is_valid = compare_tokens(g_cmd_cbs.actions[*action_idx], (char *) g_tok_bufr.tok_array[ARG_ACTION_IDX]);
 
         if (token_is_valid)
             break;
@@ -346,7 +346,7 @@ static yacl_error_t get_protocol_lut_idxs(uint32_t* protocol_idx, uint32_t* acti
     return YACL_SUCCESS;
 }
 
-static bool compare_tokens(const char* str_lhs, const char* str_rhs, uint32_t tok_idx)
+static bool compare_tokens(const char *str_lhs, const char *str_rhs)
 {
     uint32_t str_idx = 0;
 
@@ -354,7 +354,7 @@ static bool compare_tokens(const char* str_lhs, const char* str_rhs, uint32_t to
     {
         if (str_lhs[str_idx] == str_rhs[str_idx])
         {
-            if (str_idx == '\0')
+            if (str_lhs[str_idx] == '\0')
                 return true;
             else
                 ++str_idx;
