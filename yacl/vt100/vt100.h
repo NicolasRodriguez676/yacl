@@ -4,10 +4,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-enum VT_100_Control_Sequences {
-	ESC = 0x1b,
-	CSI = 0x5b
-};
 
 void vt100_rst_term();
 void vt100_yacl_view();
