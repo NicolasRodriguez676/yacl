@@ -351,18 +351,18 @@ static bool compare_tokens(const char* str_lhs, const char* str_rhs, uint32_t to
 {
     uint32_t str_idx = 0;
 
-	while (1)
-	{
-		if (str_lhs[str_idx] == str_rhs[str_idx])
-		{
-			if (str_idx == g_tok_bufr.tok_array[tok_idx][TOKENS_LEN_IDX])
-				return true;
-			else
-				++str_idx;
-		}
-		else
-			return false;
-	}
+    while (1)
+    {
+        if (str_lhs[str_idx] == str_rhs[str_idx])
+        {
+            if (str_idx == '\0')
+                return true;
+            else
+                ++str_idx;
+        }
+        else
+            return false;
+    }
 }
 
 static yacl_error_t bufr_chk()
@@ -500,20 +500,10 @@ static bool get_str_value(uint32_t* data, uint32_t tok_idx)
 			empty_bufrs();
 			vt100_error_data(yacl_error_desc(YACL_INVALID_ARG), tok_idx + 1);
 
-			return false;
-		}
-	}
-	uint32_t check_result = strtoul((char*)g_tok_bufr.tok_array[tok_idx], &end_ptr, base);
-
-	if (check_result == ULONG_MAX)
-	{
-		empty_bufrs();
-		vt100_error_data(yacl_error_desc(YACL_INVALID_ARG), tok_idx + 1);
-
-		return false;
-	}
-
-	*data = check_result;
+            return false;
+        }
+    }
+    *data = (uint32_t)strtoull((char*)g_tok_bufr.tok_array[tok_idx], &end_ptr, base);
 
 	return true;
 }
