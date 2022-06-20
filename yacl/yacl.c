@@ -1,6 +1,5 @@
 #include <stdbool.h>
 #include <stdlib.h>
-#include <limits.h>
 #include <ctype.h>
 
 #include "yacl.h"
@@ -71,8 +70,8 @@ void yacl_init(yacl_usr_callbacks_t* usr_callbacks)
 	// clear the VT100 terminal screen
 	vt100_rst_term();
 
-	// display welcome message
-	yacl_printf("YACL by Nick\n\nExplore peripherals connected to your MCU freely!\nType 'help' for more information or visit my GitHub\n\n>> ");
+    // display welcome message
+    yacl_printf("YACL by Nick\n\n\rExplore peripherals connected to your MCU freely!\n\rType 'help' for more information or visit my GitHub\n\n\r>> ");
 }
 
 void yacl_wr_buf(char data)
@@ -181,12 +180,12 @@ yacl_error_t yacl_parse_cmd()
 		if (inout_data.beg_reg > inout_data.end_reg)
 			start = inout_data.end_reg;
 
-		yacl_printf("\n");
-		for (uint32_t i = 0; i < inout_data.range; ++i)
-			yacl_printf("0x%04x  ::  %d\n", start + i, inout_data.bufr[i]);
+        yacl_printf("\n\r");
+        for (uint32_t i = 0; i < inout_data.range; ++i)
+            yacl_printf("0x%04x  ::  %d\n\r", start + i, inout_data.bufr[i]);
 
-		yacl_printf("\n");
-	}
+        yacl_printf("\n\r");
+    }
 
 	empty_bufrs();
 	vt100_yacl_view();
@@ -577,9 +576,10 @@ static void init_cbs(yacl_usr_callbacks_t* usr_callbacks)
 
 static void help_func(yacl_inout_data_t* inout_data)
 {
-	yacl_printf("\nYACL Help\n\n\t<protocol> <action> <addr> <reg> [optional reg end] [data]\n\n");
+    yacl_printf("\n\rYACL Help\n\n\r\t<protocol> <action> <addr> <reg> [optional reg end] [data]\n\n\r");
 
-	for (uint32_t i = 0; i < g_cmd_cbs.num_not_null_cbs; ++i)
-		yacl_printf("  %s :: read + write\n", g_cmd_cbs.protocols[i]);
-	yacl_printf("\n");
+
+    for (uint32_t i = 0; i < g_cmd_cbs.num_not_null_cbs; ++i)
+        yacl_printf("  %s :: read + write\n", g_cmd_cbs.protocols[i]);
+    yacl_printf("\n");
 }
