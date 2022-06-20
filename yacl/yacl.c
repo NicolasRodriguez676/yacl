@@ -568,7 +568,11 @@ static void help_func(yacl_inout_data_t* inout_data)
     yacl_printf("\n\rYACL Help\n\n\r\t<protocol> <action> <addr> <reg> [optional reg end] [data]\n\n\r");
 
 
-    for (uint32_t i = 0; i < g_cmd_cbs.num_not_null_cbs; ++i)
-        yacl_printf("  %s :: read + write\n", g_cmd_cbs.protocols[i]);
-    yacl_printf("\n");
+    for (uint32_t i = 0; i < NUM_PROTOCOLS; ++i)
+    {
+        if (g_cmd_cbs.not_null_cbs[i])
+            yacl_printf("%s :: read + write\n\r", g_cmd_cbs.protocols[i]);
+    }
+
+    yacl_printf("\n\r");
 }
