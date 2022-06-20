@@ -14,11 +14,11 @@ usr_printf_t yacl_printf;
 //usr_snprintf_t yacl_snprintf;
 
 static protocol_lut_cb_t g_cmd_cbs = {
-	.protocols = { "gpio", "i2c", "help" },
-	.actions = { "read", "write" },
-	.funcs = { { NULL, NULL } },
-	.not_null_cbs = { false },
-	.num_not_null_cbs = 0
+        .protocols = { "gpio", "i2c", "spi", "help" },
+        .actions = { "read", "write" },
+        .funcs = { { NULL, NULL } },
+        .not_null_cbs = { false },
+        .num_not_null_cbs = 0
 };
 
 static ring_buffer_t g_input_bufr = { .bufr = { 0 }, .head = 0, .tail = 0 };
@@ -77,16 +77,13 @@ void yacl_init(yacl_usr_callbacks_t* usr_callbacks)
 
 void yacl_wr_buf(char data)
 {
-	// check if input buffer has enough space
-	// if not then flag buffer to be erased later
-	if (bufr_chk() == YACL_BUF_FULL)
-	{
-		input_bufr_ok = false;
-		return;
-	}
-
-	if (data == DELIM_CRETURN)
-		return;
+    // check if input buffer has enough space
+    // if not then flag buffer to be erased later
+    if (bufr_chk() == YACL_BUF_FULL)
+    {
+        input_bufr_ok = false;
+        return;
+    }
 
 	g_input_bufr.bufr[g_input_bufr.head++ & 0x7f] = data;
 	return;
@@ -205,8 +202,11 @@ void yacl_set_cb_null(yacl_usr_callbacks_t* usr_callbacks)
 	usr_callbacks->usr_gpio_read = NULL;
 	usr_callbacks->usr_gpio_write = NULL;
 
-	usr_callbacks->usr_i2c_read = NULL;
-	usr_callbacks->usr_i2c_write = NULL;
+    usr_callbacks->usr_i2c_read = NULL;
+    usr_callbacks->usr_i2c_write = NULL;
+
+    usr_callbacks->usr_spi_read = NULL;
+    usr_callbacks->usr_spi_write = NULL;
 }
 
 const char* yacl_error_desc(yacl_error_t error)
@@ -561,9 +561,18 @@ static void init_cbs(yacl_usr_callbacks_t* usr_callbacks)
 		g_cmd_cbs.funcs[I2C_CB_IDX][READ_CB_IDX] = usr_callbacks->usr_i2c_read;
 		g_cmd_cbs.funcs[I2C_CB_IDX][WRITE_CB_IDX] = usr_callbacks->usr_i2c_write;
 
-		g_cmd_cbs.not_null_cbs[I2C_CB_IDX] = true;
-		++g_cmd_cbs.num_not_null_cbs;
-	}
+        g_cmd_cbs.not_null_cbs[I2C_CB_IDX] = true;
+        ++g_cmd_cbs.num_not_null_cbs;
+    }
+
+    if (usr_callbacks->usr_spi_read && usr_callbacks->usr_spi_write)
+    {
+        g_cmd_cbs.funcs[SPI_CB_IDX][READ_CB_IDX] = usr_callbacks->usr_spi_read;
+        g_cmd_cbs.funcs[SPI_CB_IDX][WRITE_CB_IDX] = usr_callbacks->usr_spi_write;
+
+        g_cmd_cbs.not_null_cbs[SPI_CB_IDX] = true;
+        ++g_cmd_cbs.num_not_null_cbs;
+    }
 }
 
 static void help_func(yacl_inout_data_t* inout_data)
