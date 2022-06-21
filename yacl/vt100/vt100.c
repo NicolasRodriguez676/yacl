@@ -15,7 +15,7 @@ void vt100_rst_term()
 
 void vt100_yacl_view()
 {
-    yacl_printf(">> ");
+    yacl_printf("\r>> ");
 }
 
 void vt100_error(const char* error_str)
