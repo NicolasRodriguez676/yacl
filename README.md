@@ -1,11 +1,13 @@
 # About
 Yet Another Command Line (Program)
 
-This program lets you write simple commands in a VT100 terminal to execute reads and writes to various
+This program lets you write simple commands in a VT100 terminal* to execute reads and writes to various
 external devices over their respective protocols.
 
+###### \* I have used TeraTerm on Win10 and Minicom on Pop_OS!
+
 ## Requirements 
-Built and tested only with STM32 & WIN10
+Built and tested only with STM32 & WIN10 & Pop_OS!
 
 * CMake >= 3.16*
 * GCC (arm-none-eabi)
@@ -21,13 +23,13 @@ YACL is its own static library that can be installed or compiled within your pro
 
 ### CMake Environment Variables
 
-* STM32_CUBE_\<FAMILY>_PATH - path to STM32 files
-* STM32_TOOLCHAIN_PATH - path to GCC toolchain
+* `STM32_CUBE_<FAMILY>_PATH` - path to STM32 files
+* `STM32_TOOLCHAIN_PATH` - path to GCC toolchain
 
 ### System Environment Variables
 
-* CMAKE_STM32_SCRIPTS - path to ObKo's cmake scripts 
-* EMBEDDED_LIBS - custom install-directory*
+* `CMAKE_STM32_SCRIPTS` - path to ObKo's cmake scripts 
+* `EMBEDDED_LIBS` - custom install-directory*
 
 ###### \* I do not like the idea of installing in the default path, which requires admin permissions on Windows
 
@@ -96,7 +98,5 @@ yacl_init(&callbacks);
 * Properly tested (do not try them, they will not work)
 
 ### Future Goals
-* I want to implement various forms of plotting. Eventually real time plotting. (A major reason I bothered with VT100 escape sequences, other than backspace)
-* Redesign YACL with a proper statemachine
-* More keyboard support for arrow keys
+* I want to implement various forms of plotting
 * Proper unit test suite
