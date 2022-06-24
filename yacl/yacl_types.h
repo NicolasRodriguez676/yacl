@@ -17,7 +17,8 @@ enum Buffer_Lengths {
 
 enum Action_Call_Back_Index {
     READ_CB_IDX  = 0,
-    WRITE_CB_IDX = 1
+    WRITE_CB_IDX = 1,
+    PLOT_CB_IDX = 2
 };
 
 enum Protocol_Call_Back_Indexes {
@@ -43,12 +44,14 @@ enum Token_Count_Checks {
     ARG_WRITE_RANGE_CNT = 5,
 
     TOKEN_CNT_READ_MIN  = 4,
-    TOKEN_CNT_WRITE_MIN = 5
+    TOKEN_CNT_WRITE_MIN = 5,
+
+    TOKEN_CNT_PLOT_MIN  = 4
 };
 
 enum Lut_Array_Sizes {
     NUM_PROTOCOLS = 4,
-    NUM_ACTIONS   = 2,
+    NUM_ACTIONS   = 3,
 };
 
 typedef struct error_desc {
@@ -76,7 +79,7 @@ typedef struct data_buffer {
 typedef struct protocol_lut_cb {
     char* protocols[NUM_PROTOCOLS + 1];
     char* actions[NUM_ACTIONS];
-    cb_funcs_t funcs[(NUM_PROTOCOLS * 2) + 1][2];
+    cb_funcs_t funcs[(NUM_PROTOCOLS * NUM_ACTIONS) + 1][NUM_ACTIONS];
 
     bool not_null_cbs[NUM_PROTOCOLS];
     uint32_t num_not_null_cbs;

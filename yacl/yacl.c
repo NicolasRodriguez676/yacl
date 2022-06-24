@@ -14,7 +14,7 @@ usr_printf_t yacl_printf;
 
 static protocol_lut_cb_t g_cmd_cbs = {
         .protocols = { "gpio", "i2c", "spi", "help" },
-        .actions = { "read", "write" },
+        .actions = { "read", "write", "plot" },
         .funcs = { { NULL, NULL } },
         .not_null_cbs = { false },
         .num_not_null_cbs = 0
@@ -185,6 +185,11 @@ yacl_error_t yacl_parse_cmd()
 
         yacl_printf("\n\r");
     }
+    else if (action_idx == PLOT_CB_IDX)
+    {
+        yacl_printf("\n\r");
+        yacl_printf("it works!");
+    }
 
     empty_bufrs();
     vt100_yacl_view();
@@ -199,12 +204,15 @@ void yacl_set_cb_null(yacl_usr_callbacks_t* usr_callbacks)
 
     usr_callbacks->usr_gpio_read = NULL;
     usr_callbacks->usr_gpio_write = NULL;
+    usr_callbacks->usr_gpio_plot = NULL;
 
     usr_callbacks->usr_i2c_read = NULL;
     usr_callbacks->usr_i2c_write = NULL;
+    usr_callbacks->usr_i2c_plot = NULL;
 
     usr_callbacks->usr_spi_read = NULL;
     usr_callbacks->usr_spi_write = NULL;
+    usr_callbacks->usr_spi_plot = NULL;
 }
 
 const char* yacl_error_desc(yacl_error_t error)
@@ -220,7 +228,7 @@ const char* yacl_error_desc(yacl_error_t error)
             { YACL_NOT_ENUF_ARGS,   "command missing args"                      },
             { YACL_INVALID_ARG,     "invalid arg"                               },
             { YACL_INOUT_BUFR,      "register range greater than inout buffer"  },
-            { YACL_NO_CALLBACK,     "command was not given a callback function" },
+            { YACL_NO_CALLBACK,    "command was not given a callback function" },
     };
 
     return error_desc[error].msg;
@@ -435,9 +443,16 @@ static bool check_arg_count(uint32_t action)
         else
             return false;
     }
-    else // if (action == WRITE_CB_IDX)
+    else if (action == WRITE_CB_IDX)
     {
         if (g_tok_bufr.tok_cnt >= TOKEN_CNT_WRITE_MIN)
+            return true;
+        else
+            return false;
+    }
+    else // if (action == PLOT_CB_IDX)
+    {
+        if (g_tok_bufr.tok_cnt >= TOKEN_CNT_PLOT_MIN)
             return true;
         else
             return false;
@@ -464,7 +479,7 @@ static bool conv_args_num(yacl_inout_data_t* inout_data, uint32_t action)
         inout_data->end_reg = inout_data->beg_reg;
         return true;
     }
-    else // if (action == WRITE_CB_IDX)
+    else if (action == WRITE_CB_IDX)
     {
         if (g_tok_bufr.tok_cnt > ARG_WRITE_RANGE_CNT)
         {
@@ -478,6 +493,11 @@ static bool conv_args_num(yacl_inout_data_t* inout_data, uint32_t action)
         inout_data->end_reg = inout_data->beg_reg;
         if (get_str_value(&inout_data->data, ARG_DATA0_IDX) == false)
             return false;
+        return true;
+    }
+    else // if (action == PLOT_CB_IDX)
+    {
+        inout_data->end_reg = inout_data->beg_reg;
         return true;
     }
 }
@@ -502,7 +522,7 @@ static bool get_str_value(uint32_t* data, uint32_t tok_idx)
             return false;
         }
     }
-    *data = (uint32_t)strtoull((char*)g_tok_bufr.tok_array[tok_idx], &end_ptr, base);
+    *data = (uint32_t)strtoull((char*)g_tok_bufr.tok_array[tok_idx], &end_ptr, (int32_t)base);
 
     return true;
 }
@@ -535,28 +555,31 @@ static void init_cbs(yacl_usr_callbacks_t* usr_callbacks)
     g_cmd_cbs.funcs[HELP_CB_IDX][0] = help_func;
 //	g_cmd_cbs.funcs[HELP_CB_IDX][1] = help_func;
 
-    if (usr_callbacks->usr_gpio_read && usr_callbacks->usr_gpio_write)
+    if (usr_callbacks->usr_gpio_read && usr_callbacks->usr_gpio_write && usr_callbacks->usr_gpio_plot)
     {
         g_cmd_cbs.funcs[GPIO_CB_IDX][READ_CB_IDX] = usr_callbacks->usr_gpio_read;
         g_cmd_cbs.funcs[GPIO_CB_IDX][WRITE_CB_IDX] = usr_callbacks->usr_gpio_write;
+        g_cmd_cbs.funcs[GPIO_CB_IDX][PLOT_CB_IDX] = usr_callbacks->usr_gpio_plot;
 
         g_cmd_cbs.not_null_cbs[GPIO_CB_IDX] = true;
         ++g_cmd_cbs.num_not_null_cbs;
     }
 
-    if (usr_callbacks->usr_i2c_read && usr_callbacks->usr_i2c_write)
+    if (usr_callbacks->usr_i2c_read && usr_callbacks->usr_i2c_write && usr_callbacks->usr_i2c_plot)
     {
         g_cmd_cbs.funcs[I2C_CB_IDX][READ_CB_IDX] = usr_callbacks->usr_i2c_read;
         g_cmd_cbs.funcs[I2C_CB_IDX][WRITE_CB_IDX] = usr_callbacks->usr_i2c_write;
+        g_cmd_cbs.funcs[I2C_CB_IDX][PLOT_CB_IDX] = usr_callbacks->usr_i2c_plot;
 
         g_cmd_cbs.not_null_cbs[I2C_CB_IDX] = true;
         ++g_cmd_cbs.num_not_null_cbs;
     }
 
-    if (usr_callbacks->usr_spi_read && usr_callbacks->usr_spi_write)
+    if (usr_callbacks->usr_spi_read && usr_callbacks->usr_spi_write && usr_callbacks->usr_spi_plot)
     {
         g_cmd_cbs.funcs[SPI_CB_IDX][READ_CB_IDX] = usr_callbacks->usr_spi_read;
         g_cmd_cbs.funcs[SPI_CB_IDX][WRITE_CB_IDX] = usr_callbacks->usr_spi_write;
+        g_cmd_cbs.funcs[SPI_CB_IDX][PLOT_CB_IDX] = usr_callbacks->usr_spi_plot;
 
         g_cmd_cbs.not_null_cbs[SPI_CB_IDX] = true;
         ++g_cmd_cbs.num_not_null_cbs;
@@ -567,11 +590,10 @@ static void help_func(yacl_inout_data_t* inout_data)
 {
     yacl_printf("\n\rYACL Help\n\n\r\t<protocol> <action> <addr> <reg> [optional reg end] [data]\n\n\r");
 
-
     for (uint32_t i = 0; i < NUM_PROTOCOLS; ++i)
     {
         if (g_cmd_cbs.not_null_cbs[i])
-            yacl_printf("%s :: read + write\n\r", g_cmd_cbs.protocols[i]);
+            yacl_printf("%s :: read + write + plot\n\r", g_cmd_cbs.protocols[i]);
     }
 
     yacl_printf("\n\r");

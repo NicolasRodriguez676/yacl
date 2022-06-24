@@ -55,12 +55,17 @@ typedef void (* cb_funcs_t)(yacl_inout_data_t* inout_data);
 typedef struct yacl_usr_callbacks {
     usr_print_funcs_t usr_print_funcs;
 
-    cb_funcs_t usr_gpio_write;
     cb_funcs_t usr_gpio_read;
+    cb_funcs_t usr_gpio_write;
+    cb_funcs_t usr_gpio_plot;
+
     cb_funcs_t usr_i2c_read;
     cb_funcs_t usr_i2c_write;
+    cb_funcs_t usr_i2c_plot;
+
     cb_funcs_t usr_spi_read;
     cb_funcs_t usr_spi_write;
+    cb_funcs_t usr_spi_plot;
 
 } yacl_usr_callbacks_t;
 
