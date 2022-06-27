@@ -216,8 +216,8 @@ yacl_error_t yacl_parse_cmd()
     }
     else if (action_idx == PLOT_CB_IDX)
     {
-        yacl_printf("\n\r");
-        yacl_printf("it works!\n\n");
+        // reset cursor for next command
+        vt100_end_plot(&g_graph);
     }
 
     empty_bufrs();
