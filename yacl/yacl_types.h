@@ -6,6 +6,7 @@ enum Control_Characters {
     DELIM_SPACE         = 32,
     DELIM_NEWLINE       = 10,
     CNTRL_BACKSPACE     = 127,
+    EXIT_PLOT           = 'q'
 };
 
 enum Buffer_Lengths {
@@ -46,7 +47,7 @@ enum Token_Count_Checks {
     TOKEN_CNT_READ_MIN  = 4,
     TOKEN_CNT_WRITE_MIN = 5,
 
-    TOKEN_CNT_PLOT_MIN  = 4
+    TOKEN_CNT_PLOT_MIN  = 2
 };
 
 enum Lut_Array_Sizes {

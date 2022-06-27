@@ -69,12 +69,30 @@ typedef struct yacl_usr_callbacks {
 
 } yacl_usr_callbacks_t;
 
+typedef struct yacl_graph_properties {
+    // max number of samples in display  -- uint8_t
+    uint8_t num_samples;
+
+    // vertical measurement unit         -- char*
+    char* units;
+
+    // measurement range                 -- float, float
+    float upper_range;
+    float lower_range;
+
+    // measurement steps                 -- uint32_t
+    uint32_t num_steps;
+
+} yacl_graph_t;
+
 //      FUNCTIONS
 
-void yacl_init(yacl_usr_callbacks_t* usr_callbacks);
+void yacl_init(yacl_usr_callbacks_t *usr_callbacks, yacl_graph_t *usr_graph);
 
 yacl_error_t yacl_parse_cmd();
 void         yacl_wr_buf(char data);
+yacl_error_t yacl_plot(float data);
+
 void         yacl_set_cb_null(yacl_usr_callbacks_t* usr_callbacks);
 
 const char*  yacl_error_desc(yacl_error_t error);
