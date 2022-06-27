@@ -1,9 +1,12 @@
 #include "vt100.h"
 
-
 // https://tintin.mudhalla.net/info/vt100/
 // https://vt100.net/docs/vt102-ug/appendixc.html
 // https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h3-Application-Program-Command-functions
+
+enum Plot_Buffer_Sizes {
+    NUM_VERT_LABELS = 48
+};
 
 extern usr_printf_t yacl_printf;
 extern usr_snprintf_t yacl_snprintf;
@@ -63,7 +66,7 @@ void vt100_draw_graph(yacl_graph_t* graph)
     char graph_fill_blanks[24] = { '\0' };
     yacl_snprintf(graph_fill_blanks, sizeof(graph_fill_blanks), "\x1b[1D\x1b[%u@\x1b[%uC", graph->num_samples, graph->num_samples + 1);
 
-    char graph_vt_labels[48][8] = { {'\0'} };
+    char graph_vt_labels[NUM_VERT_LABELS][8] = { {'\0'} };
 
     float step_size = get_step_size(graph);
     float label_val = graph->lower_range;
@@ -106,7 +109,7 @@ void vt100_plot_graph(yacl_graph_t* graph, float data)
     if (display_count == graph->num_samples)
     {
         --display_count;
-        char move_display[64] = { '\0' };
+        char move_display[48] = { '\0' };
 
         yacl_snprintf(move_display, sizeof(move_display)/sizeof(move_display[0]), "\r\x1b[1C\x1b[1P\x1b[%uC\x1b[1P\x1b[2@\x1b[1B", graph->num_samples - 2);
 
