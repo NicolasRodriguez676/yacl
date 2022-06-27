@@ -10,7 +10,7 @@
 //      GLOBALS
 
 usr_printf_t yacl_printf;
-//usr_snprintf_t yacl_snprintf;
+usr_snprintf_t yacl_snprintf;
 
 static protocol_lut_cb_t g_cmd_cbs = {
         .protocols = { "gpio", "i2c", "spi", "help" },
@@ -56,7 +56,7 @@ void yacl_init(yacl_usr_callbacks_t* usr_callbacks)
 {
     // assume user provides valid printf functions
     yacl_printf = usr_callbacks->usr_print_funcs.usr_printf;
-//	yacl_snprintf = usr_callbacks->usr_print_funcs.usr_snprintf;
+    yacl_snprintf = usr_callbacks->usr_print_funcs.usr_snprintf;
 
     // initialize callbacks into protocol lookup table
     // record non-null callbacks as valid

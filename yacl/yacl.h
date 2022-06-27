@@ -32,11 +32,11 @@ typedef enum yacl_error {
 } yacl_error_t;
 
 typedef int (* usr_printf_t)(const char* format, ...);
-//typedef int (* usr_snprintf_t)(char* buffer, size_t count, const char* format, ...);
+typedef int (* usr_snprintf_t)(char* buffer, size_t count, const char* format, ...);
 
 typedef struct usr_print_funcs {
     usr_printf_t usr_printf;
-//	usr_snprintf_t usr_snprintf;
+    usr_snprintf_t usr_snprintf;
 
 } usr_print_funcs_t;
 

@@ -4,7 +4,7 @@
 // https://tintin.mudhalla.net/info/vt100/
 
 extern usr_printf_t yacl_printf;
-//extern int (* yacl_snprintf)(char* buffer, size_t count, const char* format, ...);
+extern usr_snprintf_t yacl_snprintf;
 
 
 void vt100_rst_term()
