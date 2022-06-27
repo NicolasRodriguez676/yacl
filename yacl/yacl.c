@@ -24,6 +24,15 @@ static ring_buffer_t g_input_bufr = { .bufr = { 0 }, .head = 0, .tail = 0 };
 static data_buffer_t g_tok_bufr = { .bufr = { 0 }, .idx = 0, .tok_array= { NULL }, .tok_cnt = 0 };
 
 static bool input_bufr_ok = true;
+static bool is_plot       = false;
+
+static yacl_graph_t g_graph = {
+        .upper_range = 1.0f,
+        .lower_range = 0.0f,
+        .num_steps   = 11,
+        .num_samples = 60,
+        .units       = "V",
+};
 
 //      FUNCTION PROTOTYPES
 
@@ -67,6 +76,9 @@ void yacl_init(yacl_usr_callbacks_t* usr_callbacks)
     for (uint32_t i = 0; i < MAX_TOKENS; ++i)
         g_tok_bufr.tok_array[i] = g_tok_bufr.bufr + (MAX_TOKEN_LEN * i);
 
+    // set up the graph properties for plotting
+    init_graph(usr_graph);
+
     // clear the VT100 terminal screen
     vt100_rst_term();
 
@@ -81,6 +93,13 @@ void yacl_wr_buf(char data)
     if (bufr_chk() == YACL_BUF_FULL)
     {
         input_bufr_ok = false;
+        return;
+    }
+
+    if (is_plot)
+    {
+        if (data == EXIT_PLOT)
+            is_plot = false;
         return;
     }
 
@@ -153,7 +172,15 @@ yacl_error_t yacl_parse_cmd()
         // OR allows bypassing inout buffer range, while still
         // calculating range for write operation
         if (get_reg_range(&inout_data) == YACL_SUCCESS || action_idx)
+        {
+            if (action_idx == PLOT_CB_IDX)
+            {
+                is_plot = true;
+                vt100_draw_graph(&g_graph);
+            }
+
             g_cmd_cbs.funcs[protocol_idx][action_idx](&inout_data);
+        }
         else
         {
             empty_bufrs();
@@ -195,6 +222,17 @@ yacl_error_t yacl_parse_cmd()
     vt100_yacl_view();
 
     return YACL_SUCCESS;
+}
+
+yacl_error_t yacl_plot(float data)
+{
+    if (is_plot)
+    {
+        vt100_plot_graph(&g_graph, data);
+        return YACL_SUCCESS;
+    }
+    else
+        return YACL_NO_CMD;
 }
 
 void yacl_set_cb_null(yacl_usr_callbacks_t* usr_callbacks)
@@ -597,4 +635,16 @@ static void help_func(yacl_inout_data_t* inout_data)
     }
 
     yacl_printf("\n\r");
+}
+
+void init_graph(yacl_graph_t *usr_graph)
+{
+    if (!usr_graph)
+        return;
+
+    g_graph.units       = usr_graph->units;
+    g_graph.num_samples = usr_graph->num_samples;
+    g_graph.num_steps   = usr_graph->num_steps;
+    g_graph.upper_range = usr_graph->upper_range;
+    g_graph.lower_range = usr_graph->lower_range;
 }
