@@ -2,6 +2,8 @@
 
 
 // https://tintin.mudhalla.net/info/vt100/
+// https://vt100.net/docs/vt102-ug/appendixc.html
+// https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h3-Application-Program-Command-functions
 
 extern usr_printf_t yacl_printf;
 extern usr_snprintf_t yacl_snprintf;
