@@ -59,9 +59,11 @@ static yacl_error_t get_reg_range(yacl_inout_data_t* inout_data);
 static void         help_func(yacl_inout_data_t* inout_data);
 static void         init_cbs(yacl_usr_callbacks_t* usr_callbacks);
 
+static void         init_graph(yacl_graph_t* usr_graph);
+
 //      PUBLIC      ****************************************************************************************************
 
-void yacl_init(yacl_usr_callbacks_t* usr_callbacks)
+void yacl_init(yacl_usr_callbacks_t *usr_callbacks, yacl_graph_t *usr_graph)
 {
     // assume user provides valid printf functions
     yacl_printf = usr_callbacks->usr_print_funcs.usr_printf;
