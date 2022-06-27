@@ -15,7 +15,7 @@ set_target_properties(YACL
             PUBLIC_HEADER ${CMAKE_SOURCE_DIR}/yacl/yacl.h
 )
 
-if (DEFINED ENV{BUILD-STM32F4})
+if (${BUILD-STM32F4})
     target_compile_options(YACL
         PUBLIC
             -mcpu=cortex-m4

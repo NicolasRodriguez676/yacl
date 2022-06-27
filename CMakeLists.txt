@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.22)
 
 option(BUILD-STM32 "build library using gcc toolchain for STM32" ON)
+option(BUILD-STM32F4 "build library using stm32f4 compile options" ON)
 option(INSTALL-YACL "make an install target" ON)
 
 if (${BUILD-STM32})

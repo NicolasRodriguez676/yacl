@@ -11,13 +11,13 @@ find_package(CMSIS COMPONENTS STM32F4 REQUIRED)
 find_package(HAL COMPONENTS "STM32F4 LL_RCC LL_GPIO LL_USART CORTEX" REQUIRED)
 find_package(YACL 0.4 REQUIRED)
 
-add_executable(${PROJECT_NAME} toggle-led.c stm32f4xx_setup.h stm32f4xx_hal_conf.h)
+add_executable(toggle-led toggle-led.c stm32f4xx_setup.h stm32f4xx_hal_conf.h)
 
 add_subdirectory(printf)
 
-target_include_directories(${PROJECT_NAME} PRIVATE printf)
+target_include_directories(toggle-led PRIVATE printf)
 
-target_link_libraries(${PROJECT_NAME}
+target_link_libraries(toggle-led
         PUBLIC
             HAL::STM32::F4::LL_RCC
             HAL::STM32::F4::LL_GPIO
@@ -28,8 +28,12 @@ target_link_libraries(${PROJECT_NAME}
             YACL::YACL
         )
 
-target_compile_options(${PROJECT_NAME}
+target_compile_options(toggle-led
         PUBLIC
+            -mcpu=cortex-m4
+            -mfpu=fpv4-sp-d16
+            -mfloat-abi=hard
+
             -fno-builtin-printf
             -O2
             -DUSE_FULL_LL_DRIVER
@@ -37,8 +41,8 @@ target_compile_options(${PROJECT_NAME}
             -std=c11
         )
 
-stm32_print_size_of_target(${PROJECT_NAME})
-stm32_generate_binary_file(${PROJECT_NAME})
+stm32_print_size_of_target(toggle-led)
+stm32_generate_binary_file(toggle-led)
 
 #add_custom_target(flash
 #        COMMAND
