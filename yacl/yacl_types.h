@@ -1,6 +1,7 @@
 #ifndef _YACL_TYPES_H_
 #define _YACL_TYPES_H_
 
+#include "yP.h"
 
 enum Control_Characters {
     DELIM_SPACE         = 32,

@@ -110,6 +110,43 @@ void yacl_wr_buf(char data)
 
 yacl_error_t yacl_parse_cmd()
 {
+    /*//////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
+
+    char* data_args[32]             = { [0 ... 31] = NULL };
+    uint32_t data_base[32]          = { [0 ... 31] = 10 };
+    option_data_stack_s data_stack  = { .args = data_args, .base = data_base, .idx = 0 };
+
+    char* reg_args[32]              = { [0 ... 31] = NULL };
+    uint32_t reg_base[32]           = { [0 ... 31] = 10 };
+    option_data_stack_s reg_stack   = { .args = reg_args, .base = reg_base, .idx = 0 };
+
+    char* addr_args[1]              = { NULL };
+    uint32_t addr_base[1]           = { 10 };
+    option_data_stack_s addr_stack  = { .args = addr_args, .base = addr_base, .idx = 0 };
+
+    char* state_args[1]             = { NULL };
+    uint32_t state_base[1]          = { 10 };
+    option_data_stack_s state_stack = { .args = state_args, .base = state_base, .idx = 0 };
+
+    walk_stack_s stack = {
+        .action = ACTION_NONE,
+        .stream = STREAM_NONE,
+
+        .valid_options = { false },
+
+        .options[OPT_DATA]  = data_stack,
+        .options[OPT_REG]   = reg_stack,
+        .options[OPT_ADDR]  = addr_stack,
+        .options[OPT_STATE] = state_stack
+    };
+
+    yaclG_parse((char*)g_input_bufr.bufr, (char*)g_input_bufr.bufr + g_input_bufr.head, &stack);
+
+    empty_bufrs();
+    vt100_yacl_view();
+    return YACL_SUCCESS;
+    /*//////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
+
     yacl_error_t error;
 
     if (input_bufr_ok)
@@ -125,7 +162,6 @@ yacl_error_t yacl_parse_cmd()
     // if process buffer is not complete, return. Normally means '\n' has not been received
     if (error != YACL_SUCCESS)
         return error;
-
     uint32_t protocol_idx = 0;
     uint32_t action_idx = 0;
 

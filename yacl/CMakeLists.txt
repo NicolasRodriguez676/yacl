@@ -7,8 +7,10 @@ target_sources(YACL
 )
 
 add_subdirectory(vt100)
+add_subdirectory(yP)
 
 target_include_directories(YACL PRIVATE vt100)
+target_include_directories(YACL PRIVATE yP)
 
 set_target_properties(YACL
         PROPERTIES
