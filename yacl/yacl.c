@@ -61,6 +61,13 @@ static void         init_cbs(yacl_usr_callbacks_t* usr_callbacks);
 
 static void         init_graph(yacl_graph_t* usr_graph);
 
+/*////////////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
+
+static void init_walk_stack(walk_stack_s *walk_stack, option_data_stack_s *option_stack, char **args, uint32_t *base);
+static void init_option_stack(option_data_stack_s *opt_stack, char** args, uint32_t* base, uint32_t size, uint32_t start);
+
+/*////////////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
+
 //      PUBLIC      ****************************************************************************************************
 
 void yacl_init(yacl_usr_callbacks_t *usr_callbacks, yacl_graph_t *usr_graph)
@@ -622,3 +629,38 @@ void init_graph(yacl_graph_t *usr_graph)
     g_graph.upper_range = usr_graph->upper_range;
     g_graph.lower_range = usr_graph->lower_range;
 }
+
+/*////////////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
+
+static void init_walk_stack(walk_stack_s *walk_stack, option_data_stack_s *option_stack, char **args, uint32_t *base)
+{
+    walk_stack->action = ACTION_NONE;
+    walk_stack->stream = STREAM_NONE;
+
+    for (uint32_t i = OPT_DATA; i < NUM_OPTIONS; ++i)
+    {
+        walk_stack->valid_options[i] = false;
+        walk_stack->options[i] = option_stack[i];
+    }
+
+    init_option_stack(&walk_stack->options[OPT_DATA],  args, base, OPT_DATA_SIZE,  OPT_DATA_OFFSET );
+    init_option_stack(&walk_stack->options[OPT_REG],   args, base, OPT_REG_SIZE,   OPT_REG_OFFSET  );
+    init_option_stack(&walk_stack->options[OPT_ADDR],  args, base, OPT_ADDR_SIZE,  OPT_ADDR_OFFSET );
+    init_option_stack(&walk_stack->options[OPT_STATE], args, base, OPT_STATE_SIZE, OPT_STATE_OFFSET);
+}
+
+static void init_option_stack(option_data_stack_s *opt_stack, char** args, uint32_t* base, uint32_t size, uint32_t start)
+{
+    opt_stack->args = args + start;
+    opt_stack->base = base + start;
+
+    for (uint32_t i = 0; i < size; ++i)
+    {
+        opt_stack->args[i] = NULL;
+        opt_stack->base[i] = 10;
+    }
+
+    opt_stack->idx = 0;
+}
+
+/*////////////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
