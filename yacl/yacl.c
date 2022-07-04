@@ -111,155 +111,91 @@ void yacl_wr_buf(char data)
 yacl_error_t yacl_parse_cmd()
 {
     /*//////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
+    if (g_input_bufr.bufr[(g_input_bufr.head - 1) & 0x7f] != '\n')
+        return YACL_NO_CMD;
 
-    char* data_args[32]             = { [0 ... 31] = NULL };
-    uint32_t data_base[32]          = { [0 ... 31] = 10 };
-    option_data_stack_s data_stack  = { .args = data_args, .base = data_base, .idx = 0 };
+    char* stack_args[OPT_DATA_SIZE + OPT_REG_SIZE + OPT_ADDR_SIZE + OPT_STATE_SIZE];
+    uint32_t stack_base[OPT_DATA_SIZE + OPT_REG_SIZE + OPT_ADDR_SIZE + OPT_STATE_SIZE];
+    option_data_stack_s option_stack[NUM_OPTIONS];
 
-    char* reg_args[32]              = { [0 ... 31] = NULL };
-    uint32_t reg_base[32]           = { [0 ... 31] = 10 };
-    option_data_stack_s reg_stack   = { .args = reg_args, .base = reg_base, .idx = 0 };
+    walk_stack_s stack;
+    init_walk_stack(&stack, option_stack, stack_args, stack_base);
 
-    char* addr_args[1]              = { NULL };
-    uint32_t addr_base[1]           = { 10 };
-    option_data_stack_s addr_stack  = { .args = addr_args, .base = addr_base, .idx = 0 };
-
-    char* state_args[1]             = { NULL };
-    uint32_t state_base[1]          = { 10 };
-    option_data_stack_s state_stack = { .args = state_args, .base = state_base, .idx = 0 };
-
-    walk_stack_s stack = {
-        .action = ACTION_NONE,
-        .stream = STREAM_NONE,
-
-        .valid_options = { false },
-
-        .options[OPT_DATA]  = data_stack,
-        .options[OPT_REG]   = reg_stack,
-        .options[OPT_ADDR]  = addr_stack,
-        .options[OPT_STATE] = state_stack
-    };
-
-    yaclG_parse((char*)g_input_bufr.bufr, (char*)g_input_bufr.bufr + g_input_bufr.head, &stack);
-
-    empty_bufrs();
-    vt100_yacl_view();
-    return YACL_SUCCESS;
-    /*//////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
-
-    yacl_error_t error;
-
-    if (input_bufr_ok)
-        error = proc_in_bufr();
-    else
+    if (!yaclG_parse((char*)g_input_bufr.bufr, (char*)g_input_bufr.bufr + g_input_bufr.head, &stack))
     {
-        // erase buffers if input buffer overrun
-        empty_bufrs();
-        vt100_error(yacl_error_desc(YACL_BUFRS_EMPTD));
-        return YACL_BUFRS_EMPTD;
-    }
-
-    // if process buffer is not complete, return. Normally means '\n' has not been received
-    if (error != YACL_SUCCESS)
-        return error;
-    uint32_t protocol_idx = 0;
-    uint32_t action_idx = 0;
-
-    error = get_protocol_lut_idxs(&protocol_idx, &action_idx);
-
-    if (error != YACL_SUCCESS)
-    {
-        empty_bufrs();
-        vt100_error(yacl_error_desc(error));
-
-        return error;
-    }
-
-    // prevent extraction of non-present numerical arguments for help function
-    if (protocol_idx == HELP_CB_IDX && g_tok_bufr.tok_cnt == 1)
-    {
-        yacl_inout_data_t inout_data;
-        g_cmd_cbs.funcs[protocol_idx][READ_CB_IDX](&inout_data);
-
-        empty_bufrs();
         vt100_yacl_view();
-
-        return YACL_SUCCESS;
-    }
-
-    // read and write have different minimum args
-    if (check_arg_count(action_idx) == false)
-    {
-        empty_bufrs();
-        vt100_error(yacl_error_desc(error));
-
+        empty_bufr();
         return YACL_UNKNOWN_CMD;
     }
 
     yacl_inout_data_t inout_data;
+    option_data_stack_s option;
 
-    // extract numerical arguments and save them
-    if(!conv_args_num(&inout_data, action_idx))
-        return YACL_UNKNOWN_CMD;
+    for (uint32_t i = 0; i < NUM_OPTIONS; ++i)
+    {
+        if (stack.valid_options[i] == false)
+            continue;
 
-    // check if protocol callback function is not NULL
-    if (g_cmd_cbs.not_null_cbs[protocol_idx])
+        option = stack.options[i];
+
+        if (i == OPT_DATA)
+        {
+            for (uint32_t j = 0; j < option.idx; ++j)
+                inout_data.yP_data[j] = (uint32_t) strtoull(option.args[j], &option.args[j] + strlen(option.args[j]), (int32_t) option.base[j]);
+        }
+        else if (i == OPT_REG)
+        {
+            for (uint32_t j = 0; j < option.idx; ++j)
+                inout_data.yP_reg[j] = (uint32_t) strtoull(option.args[j], &option.args[j] + strlen(option.args[j]), (int32_t) option.base[j]);
+        }
+        else if (i == OPT_ADDR)
+        {
+            inout_data.yP_addr = (uint32_t) strtoull(option.args[0], &option.args[0] + strlen(option.args[0]), (int32_t) option.base[0]);
+        }
+        else if (i == OPT_STATE)
+        {
+            inout_data.yP_state = (uint32_t) strtoull(option.args[0], &option.args[0] + strlen(option.args[0]), (int32_t) option.base[0]);
+        }
+    }
+
+    if (stack.action == ACTION_HELP)
+    {
+        g_cmd_cbs.funcs[HELP_CB_IDX][0](&inout_data);
+
+        empty_bufr();
+        vt100_yacl_view();
+        return YACL_SUCCESS;
+    }
+
+    act_flag_e action = stack.action - 1;
+    str_flag_e stream = stack.stream - 1;
+
+    if (g_cmd_cbs.not_null_cbs[stream] == true)
     {
         // verify register range for static inout_data_t buffer
         // action index for read is zero and write is one
         // OR allows bypassing inout buffer range, while still
         // calculating range for write operation
-        if (get_reg_range(&inout_data) == YACL_SUCCESS || action_idx)
+        if (action == PLOT_CB_IDX)
         {
-            if (action_idx == PLOT_CB_IDX)
-            {
-                is_plot = true;
-                vt100_draw_graph(&g_graph);
-            }
-
-            g_cmd_cbs.funcs[protocol_idx][action_idx](&inout_data);
+            is_plot = true;
+            vt100_draw_graph(&g_graph);
         }
-        else
-        {
-            empty_bufrs();
-            vt100_error(yacl_error_desc(YACL_INOUT_BUFR));
-
-            return YACL_UNKNOWN_CMD;
-        }
+            g_cmd_cbs.funcs[stream][action](&inout_data);
     }
     else
     {
-        empty_bufrs();
+        empty_bufr();
         vt100_error(yacl_error_desc(YACL_NO_CALLBACK));
 
         return YACL_UNKNOWN_CMD;
     }
 
-    if (action_idx == READ_CB_IDX)
-    {
-        // display read values from smaller address to large address, always
-        // otherwise, display one value
-        uint32_t start = inout_data.beg_reg;
-
-        if (inout_data.beg_reg > inout_data.end_reg)
-            start = inout_data.end_reg;
-
-        yacl_printf("\n\r");
-        for (uint32_t i = 0; i < inout_data.range; ++i)
-            yacl_printf("0x%04x  ::  %d\n\r", start + i, inout_data.bufr[i]);
-
-        yacl_printf("\n\r");
-    }
-    else if (action_idx == PLOT_CB_IDX)
-    {
-        // reset cursor for next command
-        vt100_end_plot(&g_graph);
-    }
-
-    empty_bufrs();
+    empty_bufr();
     vt100_yacl_view();
-
     return YACL_SUCCESS;
+
+    /*//////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
 }
 
 yacl_error_t yacl_plot(float data)
