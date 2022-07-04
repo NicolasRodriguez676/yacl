@@ -24,14 +24,32 @@ typedef enum Yacl_Stream_Flags {
 
 } str_flag_e;
 
-typedef enum Option_Stack_Indexes {
+enum Option_Stack_Sizes {
+
+    OPT_DATA_SIZE   = 32,
+    OPT_REG_SIZE    = 32,
+    OPT_ADDR_SIZE   = 1,
+    OPT_STATE_SIZE  = 1,
+};
+
+enum Option_Stack_Offsets {
+
+    OPT_DATA_OFFSET   = 0,
+    OPT_REG_OFFSET    = OPT_DATA_SIZE,
+    OPT_ADDR_OFFSET   = OPT_DATA_SIZE + OPT_REG_SIZE,
+    OPT_STATE_OFFSET  = OPT_DATA_SIZE + OPT_REG_SIZE + OPT_STATE_SIZE,
+};
+
+enum Option_Stack_Indexes {
 
     OPT_DATA      = 0,
     OPT_REG       = 1,
     OPT_ADDR      = 2,
-    OPT_STATE     = 3
+    OPT_STATE     = 3,
 
-} option_stack_idx_e;
+    NUM_OPTIONS   = 4
+
+};
 
 typedef struct Option_Data_Stack {
     
