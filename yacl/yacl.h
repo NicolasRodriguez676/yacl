@@ -41,6 +41,13 @@ typedef struct usr_print_funcs {
 } usr_print_funcs_t;
 
 typedef struct yacl_inout_data {
+
+    uint32_t yP_data[32];
+    uint32_t yP_reg[32];
+
+    uint32_t yP_addr;
+    uint32_t yP_state;
+
     uint32_t bufr[INOUT_BUFR_LEN];
     uint32_t data;
     uint32_t addr;
