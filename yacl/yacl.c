@@ -1,6 +1,6 @@
 #include <stdbool.h>
 #include <stdlib.h>
-#include <ctype.h>
+#include <string.h>
 
 #include "yacl.h"
 #include "yacl_types.h"
@@ -21,7 +21,6 @@ static protocol_lut_cb_t g_cmd_cbs = {
 };
 
 static ring_buffer_t g_input_bufr = { .bufr = { 0 }, .head = 0, .tail = 0 };
-static data_buffer_t g_tok_bufr = { .bufr = { 0 }, .idx = 0, .tok_array= { NULL }, .tok_cnt = 0 };
 
 static bool input_bufr_ok = true;
 static bool is_plot       = false;
@@ -37,24 +36,9 @@ static yacl_graph_t g_graph = {
 //      FUNCTION PROTOTYPES
 
 static yacl_error_t proc_in_bufr();
-static yacl_error_t get_protocol_lut_idxs(uint32_t* protocol_idx, uint32_t* action_idx);
-static bool         compare_tokens(const char *str_lhs, const char *str_rhs);
 
 static yacl_error_t bufr_chk();
-static void         empty_bufrs();
-static void         empty_tok_bufr();
-
-static void         psh_token();
-static void         pop_token();
-static void         null_term_token();
-static bool         wrt_to_token(uint8_t data);
-static void         rm_from_token(bool dec_idx);
-
-static bool         check_arg_count(uint32_t action);
-static bool         conv_args_num(yacl_inout_data_t* inout_data, uint32_t action);
-static bool         get_str_value(uint32_t* data, uint32_t tok_idx);
-static uint32_t     get_prefix(const uint8_t* num_str);
-static yacl_error_t get_reg_range(yacl_inout_data_t* inout_data);
+static void         empty_bufr();
 
 static void         help_func(yacl_inout_data_t* inout_data);
 static void         init_cbs(yacl_usr_callbacks_t* usr_callbacks);
@@ -79,11 +63,6 @@ void yacl_init(yacl_usr_callbacks_t *usr_callbacks, yacl_graph_t *usr_graph)
     // initialize callbacks into protocol lookup table
     // record non-null callbacks as valid
     init_cbs(usr_callbacks);
-
-    // allocate token space in static global buffer
-    // easier buffer + token management
-    for (uint32_t i = 0; i < MAX_TOKENS; ++i)
-        g_tok_bufr.tok_array[i] = g_tok_bufr.bufr + (MAX_TOKEN_LEN * i);
 
     // set up the graph properties for plotting
     init_graph(usr_graph);
@@ -257,6 +236,9 @@ const char* yacl_error_desc(yacl_error_t error)
 
 static yacl_error_t proc_in_bufr()
 {
+    return YACL_SUCCESS;
+
+    /*
     // ignore leading and consecutive backspaces
     static uint8_t prev_data = DELIM_SPACE;
 
@@ -281,7 +263,7 @@ static yacl_error_t proc_in_bufr()
 
                 if (g_tok_bufr.tok_cnt >= MAX_TOKENS)
                 {
-                    empty_bufrs();
+                    empty_bufr();
                     vt100_error(yacl_error_desc(YACL_TOO_MANY_ARGS));
 
                     return YACL_BUFRS_EMPTD;
@@ -325,7 +307,7 @@ static yacl_error_t proc_in_bufr()
                     break;
                 else
                 {
-                    empty_bufrs();
+                    empty_bufr();
                     vt100_error(yacl_error_desc(YACL_ARG_OVRN));
 
                     return YACL_BUFRS_EMPTD;
@@ -336,59 +318,7 @@ static yacl_error_t proc_in_bufr()
     }
 
     return YACL_NO_CMD;
-}
-
-static yacl_error_t get_protocol_lut_idxs(uint32_t* protocol_idx, uint32_t* action_idx)
-{
-    bool token_is_valid = false;
-
-    // find index of protocol functions that matches protocol argument
-    for ( ; *protocol_idx < NUM_PROTOCOLS; ++*protocol_idx)
-    {
-        token_is_valid = compare_tokens(g_cmd_cbs.protocols[*protocol_idx],(char *) g_tok_bufr.tok_array[ARG_PROTOCOL_IDX]);
-
-        if (token_is_valid)
-            break;
-    }
-
-    // end early if protocol index is equal to help index
-    // only one argument should be typed for the help command
-    if (!token_is_valid && *protocol_idx != HELP_CB_IDX)
-        return YACL_UNKNOWN_CMD;
-    else if (*protocol_idx == HELP_CB_IDX)
-        return YACL_SUCCESS;
-
-    // find index of action function that matches action argument
-    for ( ; *action_idx < NUM_ACTIONS; ++*action_idx)
-    {
-        token_is_valid = compare_tokens(g_cmd_cbs.actions[*action_idx], (char *) g_tok_bufr.tok_array[ARG_ACTION_IDX]);
-
-        if (token_is_valid)
-            break;
-    }
-
-    if (!token_is_valid)
-        return YACL_UNKNOWN_CMD;
-
-    return YACL_SUCCESS;
-}
-
-static bool compare_tokens(const char *str_lhs, const char *str_rhs)
-{
-    uint32_t str_idx = 0;
-
-    while (1)
-    {
-        if (str_lhs[str_idx] == str_rhs[str_idx])
-        {
-            if (str_lhs[str_idx] == '\0')
-                return true;
-            else
-                ++str_idx;
-        }
-        else
-            return false;
-    }
+    */
 }
 
 static yacl_error_t bufr_chk()
@@ -401,172 +331,12 @@ static yacl_error_t bufr_chk()
         return YACL_SUCCESS;
 }
 
-static void empty_bufrs()
+static void empty_bufr()
 {
     input_bufr_ok = true;
 
     g_input_bufr.head = 0;
     g_input_bufr.tail = 0;
-
-    empty_tok_bufr();
-}
-
-static void empty_tok_bufr()
-{
-    g_tok_bufr.tok_cnt = 0;
-    g_tok_bufr.idx = 0;
-}
-
-static void psh_token()
-{
-    null_term_token();
-    g_tok_bufr.idx = 0;
-    ++g_tok_bufr.tok_cnt;
-}
-
-static void pop_token()
-{
-    g_tok_bufr.idx = g_tok_bufr.tok_array[--g_tok_bufr.tok_cnt][TOKENS_LEN_IDX];
-}
-
-static void null_term_token()
-{
-    g_tok_bufr.tok_array[g_tok_bufr.tok_cnt][TOKENS_LEN_IDX] = g_tok_bufr.idx + 1;
-    g_tok_bufr.tok_array[g_tok_bufr.tok_cnt][g_tok_bufr.idx] = '\0';
-}
-
-static bool wrt_to_token(uint8_t data)
-{
-    // index starts at 0 + null + length == 3
-    if (g_tok_bufr.idx == MAX_TOKEN_LEN - 3)
-        return false;
-
-    g_tok_bufr.tok_array[g_tok_bufr.tok_cnt][g_tok_bufr.idx++] = data;
-    return true;
-}
-
-static void rm_from_token(bool dec_idx)
-{
-    if (dec_idx)
-        g_tok_bufr.tok_array[g_tok_bufr.tok_cnt][--g_tok_bufr.idx] = '\0';
-    else
-        g_tok_bufr.tok_array[g_tok_bufr.tok_cnt][g_tok_bufr.idx] = '\0';
-}
-
-static bool check_arg_count(uint32_t action)
-{
-    if (action == READ_CB_IDX)
-    {
-        if (g_tok_bufr.tok_cnt >= TOKEN_CNT_READ_MIN)
-            return true;
-        else
-            return false;
-    }
-    else if (action == WRITE_CB_IDX)
-    {
-        if (g_tok_bufr.tok_cnt >= TOKEN_CNT_WRITE_MIN)
-            return true;
-        else
-            return false;
-    }
-    else // if (action == PLOT_CB_IDX)
-    {
-        if (g_tok_bufr.tok_cnt >= TOKEN_CNT_PLOT_MIN)
-            return true;
-        else
-            return false;
-    }
-}
-
-static bool conv_args_num(yacl_inout_data_t* inout_data, uint32_t action)
-{
-    if (get_str_value(&inout_data->addr, ARG_ADDR_IDX) == false)
-        return false;
-
-    if (get_str_value(&inout_data->beg_reg, ARG_BEG_REG_IDX) == false)
-        return false;
-
-    if (action == READ_CB_IDX)
-    {
-        if (g_tok_bufr.tok_cnt > ARG_READ_RANGE_CNT)
-        {
-            if (get_str_value(&inout_data->end_reg, ARG_END_REG_IDX) == false)
-                return false;
-            return true;
-        }
-
-        inout_data->end_reg = inout_data->beg_reg;
-        return true;
-    }
-    else if (action == WRITE_CB_IDX)
-    {
-        if (g_tok_bufr.tok_cnt > ARG_WRITE_RANGE_CNT)
-        {
-            if (get_str_value(&inout_data->end_reg, ARG_END_REG_IDX) == false)
-                return false;
-            if (get_str_value(&inout_data->data, ARG_DATA1_IDX) == false)
-                return false;
-            return true;
-        }
-
-        inout_data->end_reg = inout_data->beg_reg;
-        if (get_str_value(&inout_data->data, ARG_DATA0_IDX) == false)
-            return false;
-        return true;
-    }
-    else // if (action == PLOT_CB_IDX)
-    {
-        inout_data->end_reg = inout_data->beg_reg;
-        return true;
-    }
-}
-
-static bool get_str_value(uint32_t* data, uint32_t tok_idx)
-{
-    uint32_t base = get_prefix(g_tok_bufr.tok_array[tok_idx]);
-    char* end_ptr = (char*)(g_tok_bufr.tok_array[tok_idx] + g_tok_bufr.tok_array[tok_idx][TOKENS_LEN_IDX]);
-
-    uint8_t i = 0;
-
-    if (base == 16)
-        i = 2;
-
-    for ( ; i < g_tok_bufr.tok_array[tok_idx][TOKENS_LEN_IDX] - 1; ++i)
-    {
-        if (!isxdigit(g_tok_bufr.tok_array[tok_idx][i]))
-        {
-            empty_bufrs();
-            vt100_error_data(yacl_error_desc(YACL_INVALID_ARG), tok_idx + 1);
-
-            return false;
-        }
-    }
-    *data = (uint32_t)strtoull((char*)g_tok_bufr.tok_array[tok_idx], &end_ptr, (int32_t)base);
-
-    return true;
-}
-
-static yacl_error_t get_reg_range(yacl_inout_data_t* inout_data)
-{
-    if (inout_data->beg_reg > inout_data->end_reg)
-        inout_data->range = (inout_data->beg_reg - inout_data->end_reg) + 1;
-    else if (inout_data->beg_reg < inout_data->end_reg)
-        inout_data->range = (inout_data->end_reg - inout_data->beg_reg) + 1;
-    else
-        inout_data->range = 1;
-
-    if (inout_data->range > INOUT_BUFR_LEN)
-        return YACL_INOUT_BUFR;
-
-    return YACL_SUCCESS;
-}
-
-static uint32_t get_prefix(const uint8_t* num_str)
-{
-    if (num_str[0] == '0' && (num_str[1] == 'x' || num_str[1] == 'X') )
-        return 16;
-    else
-        return 10;
 }
 
 static void init_cbs(yacl_usr_callbacks_t* usr_callbacks)
