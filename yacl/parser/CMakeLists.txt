@@ -1,0 +1,1 @@
+target_sources(YACL PRIVATE parser.c parser.h)

@@ -1,1 +1,0 @@
-target_sources(YACL PRIVATE yP.c yP.h)
