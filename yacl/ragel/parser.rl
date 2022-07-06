@@ -14,7 +14,7 @@ extern usr_printf_t yacl_printf;
     action write_ext { stack->action = ACTION_WRITE;}
     action read_ext  { stack->action = ACTION_READ; }
     action plot_ext  { stack->action = ACTION_PLOT; }
-    action conf_ext  { stack->action = ACTION_CONF; }
+    action set_ext   { stack->action = ACTION_SET;  }
     action help_ext  { stack->action = ACTION_HELP; }
     action clear_ext { stack->action = ACTION_CLEAR;}
 
@@ -90,7 +90,7 @@ extern usr_printf_t yacl_printf;
 
 #*** YACL PARSER CONTROL --------------------------------------------------------------------------------------------
 
-    terminator = ".";
+    terminator = "\n";
     opt_prefix = " "? . "-";
     hex_prefix = "H";
 
@@ -109,9 +109,9 @@ extern usr_printf_t yacl_printf;
     opt_w = "w " . (data_single );
 
     options = (opt_d >d_ent) |
-                 (opt_r >r_ent) |
-                 (opt_s >s_ent) |
-                 (opt_w >w_ent);
+              (opt_r >r_ent) |
+              (opt_s >s_ent) |
+              (opt_w >w_ent);
     
     option = opt_prefix . options;
     option_collect = option . ((option . terminator?){0,3} | terminator);
@@ -131,7 +131,7 @@ extern usr_printf_t yacl_printf;
     str_write = ("write"  %~write_ext) .  streams;
     str_read  = ("read"   %~read_ext)  .  streams;
     str_plot  = ("plot"   %~plot_ext)  .  streams;
-    str_conf  = ("conf"   %~conf_ext)  .  streams;
+    str_set   = ("set"   %~set_ext)    .  option_collect . terminator?;
     str_help  = ("help"   %~help_ext)  .  terminator;
     str_clear = ("clear"  %~clear_ext) .  terminator;
 
@@ -140,7 +140,7 @@ extern usr_printf_t yacl_printf;
                 str_write |
                 str_read  |
                 str_plot  |
-                str_conf  |
+                str_set   |
                 str_help  |
                 str_clear
             )
