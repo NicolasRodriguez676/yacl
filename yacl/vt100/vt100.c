@@ -17,6 +17,12 @@ static const char* vt100_res_csr = "\x1b" "8";
 
 static uint32_t display_count = 0;
 
+void vt100_welcome()
+{
+    vt100_rst_term();
+    yacl_printf("YACL by Nick\n\n\rExplore peripherals connected to your MCU freely!\n\rType 'help' for more information or visit my GitHub\n\n\r>> ");
+}
+
 void vt100_rst_term()
 {
     yacl_printf("\x1b[2J");

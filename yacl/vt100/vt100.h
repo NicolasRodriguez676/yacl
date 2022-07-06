@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include "../yacl.h"
 
-
+void vt100_welcome();
 void vt100_rst_term();
 void vt100_yacl_view();
 void vt100_error(const char* error_str);
