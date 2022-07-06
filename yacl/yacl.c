@@ -10,17 +10,18 @@
 
 //      GLOBALS
 
-usr_printf_t yacl_printf;
-usr_snprintf_t yacl_snprintf;
+usr_printf_f yacl_printf;
+usr_snprintf_f yacl_snprintf;
 
 static cb_lut_t g_cb_lut;
+static yacl_inout_data_s g_prev_inout_data;
 
 static ring_buffer_t g_input_bufr = { .bufr = { 0 }, .head = 0, .tail = 0 };
 
 static bool input_bufr_ok = true;
 static bool is_plot       = false;
 
-static yacl_graph_t g_graph = {
+static yacl_graph_s g_graph = {
         .upper_range = 1.0f,
         .lower_range = 0.0f,
         .num_steps   = 11,
@@ -30,29 +31,29 @@ static yacl_graph_t g_graph = {
 
 //      FUNCTION PROTOTYPES
 
-static yacl_error_t proc_in_bufr();
+static yacl_error_e proc_in_bufr();
 
-static yacl_error_t bufr_chk();
+static yacl_error_e bufr_chk();
 static void         empty_bufr();
 
-static void         init_cbs(cb_lut_t* cb_lut, yacl_usr_callbacks_t* usr_callbacks);
-static void         set_callbacks(cb_lut_t* cb_lut, void (**usr_cb)(yacl_inout_data_t *), str_flag_e stream);
+static void         init_cbs(cb_lut_t* cb_lut, yacl_usr_callbacks_s* usr_callbacks);
+static void         set_callbacks(cb_lut_t* cb_lut, void (**usr_cb)(yacl_inout_data_s *), stream_e stream);
 
-static void         init_graph(yacl_graph_t* usr_graph);
+static void         init_graph(yacl_graph_s* usr_graph);
 
 static void         init_walk_stack(walk_stack_s* walk_stack, option_data_stack_s* option_stack, char** args, uint32_t* base);
 static void         init_option_stack(option_data_stack_s* opt_stack, char** args, uint32_t* base, uint32_t size, uint32_t start);
-static void         get_stack_data(walk_stack_s* stack, yacl_inout_data_t* inout_data);
+static bool         get_stack_data(walk_stack_s* stack, yacl_inout_data_s* inout_data);
 
-static void         conf_func(cb_lut_t* cb_lut);
+static void         set_func(yacl_inout_data_s* prev_inout_data, yacl_inout_data_s* inout_data);
 static void         help_func(cb_lut_t* cb_lut);
 static void         clear_func();
 
-static yacl_error_t call_action_func(cb_lut_t* cb_lut, act_flag_e action, str_flag_e stream, yacl_inout_data_t* inout_data);
+static yacl_error_e call_action_func(cb_lut_t* cb_lut, action_e action, stream_e stream, yacl_inout_data_s* inout_data, yacl_inout_data_s* prev_inout_data, bool use_prev_io_data);
 
 //      PUBLIC      ****************************************************************************************************
 
-void yacl_init(yacl_usr_callbacks_t* usr_callbacks, yacl_graph_t* usr_graph)
+void yacl_init(yacl_usr_callbacks_s* usr_callbacks, yacl_graph_s* usr_graph)
 {
     // assume user provides valid printf functions
     yacl_printf = usr_callbacks->usr_print_funcs.usr_printf;
@@ -89,7 +90,7 @@ void yacl_wr_buf(char data)
     g_input_bufr.bufr[g_input_bufr.head++ & 0x7f] = data;
 }
 
-yacl_error_t yacl_parse_cmd()
+yacl_error_e yacl_parse_cmd()
 {
     if (g_input_bufr.bufr[(g_input_bufr.head - 1) & 0x7f] != '\n')
         return YACL_NO_CMD;
@@ -101,7 +102,7 @@ yacl_error_t yacl_parse_cmd()
     walk_stack_s stack;
     init_walk_stack(&stack, option_stack, stack_args, stack_base);
 
-    yacl_error_t error;
+    yacl_error_e error;
     error = parser((char *) g_input_bufr.bufr, (char *) g_input_bufr.bufr + g_input_bufr.head, &stack);
 
     if (error != YACL_SUCCESS)
@@ -111,17 +112,20 @@ yacl_error_t yacl_parse_cmd()
         return error;
     }
 
-    yacl_inout_data_t inout_data;
-    get_stack_data(&stack, &inout_data);
+    yacl_inout_data_s inout_data;
+	bool data_present = get_stack_data(&stack, &inout_data);
 
-    error = call_action_func(&g_cb_lut, stack.action, stack.stream, &inout_data);
+    error = call_action_func(&g_cb_lut, stack.action, stack.stream, &inout_data, &g_prev_inout_data, data_present);
+
+	if (error != YACL_SUCCESS)
+		vt100_error(yacl_error_desc(YACL_NO_CALLBACK));
 
     empty_bufr();
     vt100_yacl_view();
     return error;
 }
 
-yacl_error_t yacl_plot(float data)
+yacl_error_e yacl_plot(float data)
 {
     if (is_plot)
     {
@@ -132,7 +136,7 @@ yacl_error_t yacl_plot(float data)
         return YACL_NO_CMD;
 }
 
-void yacl_set_cb_null(yacl_usr_callbacks_t* usr_callbacks)
+void yacl_set_cb_null(yacl_usr_callbacks_s* usr_callbacks)
 {
     // help users choose only what they want in their build of this program
     // reduces upkeep in their program and visual clutter
@@ -150,7 +154,7 @@ void yacl_set_cb_null(yacl_usr_callbacks_t* usr_callbacks)
     usr_callbacks->usr_spi_plot  = NULL;
 }
 
-const char* yacl_error_desc(yacl_error_t error)
+const char* yacl_error_desc(yacl_error_e error)
 {
     static const error_desc_t error_desc[] = {
             { YACL_SUCCESS,         "no errors. good to go"                     },
@@ -171,7 +175,7 @@ const char* yacl_error_desc(yacl_error_t error)
 
 //      PRIVATE     ****************************************************************************************************
 
-static yacl_error_t proc_in_bufr()
+static yacl_error_e proc_in_bufr()
 {
     return YACL_SUCCESS;
 
@@ -258,7 +262,7 @@ static yacl_error_t proc_in_bufr()
     */
 }
 
-static yacl_error_t bufr_chk()
+static yacl_error_e bufr_chk()
 {
     uint8_t empty_bytes = MAX_DATA_LEN - (g_input_bufr.head - g_input_bufr.tail);
 
@@ -276,9 +280,9 @@ static void empty_bufr()
     g_input_bufr.tail = 0;
 }
 
-static void init_cbs(cb_lut_t* cb_lut, yacl_usr_callbacks_t *usr_callbacks)
+static void init_cbs(cb_lut_t* cb_lut, yacl_usr_callbacks_s *usr_callbacks)
 {
-	cb_funcs_t usr_cb[NUM_STREAMS];
+	cb_funcs_f usr_cb[NUM_STREAMS];
 
 	usr_cb[STREAM_GPIO] = usr_callbacks->usr_gpio_write;
 	usr_cb[STREAM_I2C] = usr_callbacks->usr_gpio_read;
@@ -296,9 +300,9 @@ static void init_cbs(cb_lut_t* cb_lut, yacl_usr_callbacks_t *usr_callbacks)
 	set_callbacks(cb_lut, usr_cb, STREAM_SPI);
 }
 
-static void set_callbacks(cb_lut_t* cb_lut, void (**usr_cb)(yacl_inout_data_t *), str_flag_e stream)
+static void set_callbacks(cb_lut_t* cb_lut, void (**usr_cb)(yacl_inout_data_s *), stream_e stream)
 {
-	for (act_flag_e action = ACTION_WRITE; action < NUM_USR_DEF_ACTIONS; ++action)
+	for (action_e action = ACTION_WRITE; action < NUM_USR_DEF_ACTIONS; ++action)
 	{
 		if (usr_cb[action] != NULL)
 		{
@@ -339,36 +343,53 @@ static void init_option_stack(option_data_stack_s *opt_stack, char** args, uint3
 	opt_stack->idx = 0;
 }
 
-static void get_stack_data(walk_stack_s* stack, yacl_inout_data_t* inout_data)
+static bool get_stack_data(walk_stack_s* stack, yacl_inout_data_s* inout_data)
 {
+	bool option_data_present = false;
     option_data_stack_s option;
 
-    for (uint32_t i = 0; i < NUM_OPTIONS; ++i)
+    for (opt_stack_idx_e i = OPT_DATA; i < NUM_OPTIONS; ++i)
     {
         if (stack->valid_options[i] == false)
             continue;
 
         option = stack->options[i];
 
-        if (i == OPT_DATA)
-        {
-            for (uint32_t j = 0; j < option.idx; ++j)
-                inout_data->yP_data[j] = (uint32_t) strtoull(option.args[j], &option.args[j] + strlen(option.args[j]), (int32_t) option.base[j]);
-        }
-        else if (i == OPT_REG)
-        {
-            for (uint32_t j = 0; j < option.idx; ++j)
-                inout_data->yP_reg[j] = (uint32_t) strtoull(option.args[j], &option.args[j] + strlen(option.args[j]), (int32_t) option.base[j]);
-        }
-        else if (i == OPT_ADDR)
-        {
-            inout_data->yP_addr = (uint32_t) strtoull(option.args[0], &option.args[0] + strlen(option.args[0]), (int32_t) option.base[0]);
-        }
-        else if (i == OPT_STATE)
-        {
-            inout_data->yP_state = (uint32_t) strtoull(option.args[0], &option.args[0] + strlen(option.args[0]), (int32_t) option.base[0]);
-        }
+		switch (i)
+		{
+		case OPT_DATA:
+			option_data_present = true;
+			for (uint32_t j = 0; j < option.idx; ++j)
+				inout_data->data[j] = (uint32_t)strtoull(option.args[j], &option.args[j] + strlen(option.args[j]), (int32_t)option.base[j]);
+			break;
+
+		case OPT_REG:
+			option_data_present = true;
+			for (uint32_t j = 0; j < option.idx; ++j)
+				inout_data->reg[j] = (uint32_t)strtoull(option.args[j], &option.args[j] + strlen(option.args[j]), (int32_t)option.base[j]);
+			break;
+
+		case OPT_ADDR:
+			option_data_present = true;
+			inout_data->addr = (uint32_t)strtoull(option.args[0], &option.args[0] + strlen(option.args[0]), (int32_t)option.base[0]);
+			break;
+
+		case OPT_STATE:
+			option_data_present = true;
+			inout_data->state = (uint32_t)strtoull(option.args[0], &option.args[0] + strlen(option.args[0]), (int32_t)option.base[0]);
+		}
     }
+	return option_data_present;
+}
+
+void set_func(yacl_inout_data_s* prev_inout_data, yacl_inout_data_s* inout_data)
+{
+	memcpy(prev_inout_data->data, inout_data->data, OPT_DATA_SIZE * sizeof (uint32_t));
+	memcpy(prev_inout_data->read_data, inout_data->read_data, OPT_DATA_SIZE * sizeof (uint32_t));
+	memcpy(prev_inout_data->reg, inout_data->reg, OPT_REG_SIZE* sizeof (uint32_t));
+
+	prev_inout_data->addr = inout_data->addr;
+	prev_inout_data->state = inout_data->state;
 }
 
 static void help_func(cb_lut_t* cb_lut)
@@ -384,8 +405,8 @@ static void help_func(cb_lut_t* cb_lut)
 
     char* stream_names[NUM_STREAMS] = { "gpio", "i2c", "spi"};
 
-    act_flag_e action = ACTION_WRITE;
-    str_flag_e stream = STREAM_GPIO;
+    action_e action = ACTION_WRITE;
+    stream_e stream = STREAM_GPIO;
 
     for ( ; action < NUM_USR_DEF_ACTIONS; ++action)
     {
@@ -399,7 +420,6 @@ static void help_func(cb_lut_t* cb_lut)
                     if (cb_lut->not_null_cbs[action][stream] == true)
                         yacl_printf("%s ", stream_names[stream]);
                 }
-
                 yacl_printf("\n");
                 break;
 
@@ -411,7 +431,6 @@ static void help_func(cb_lut_t* cb_lut)
                     if (cb_lut->not_null_cbs[action][stream] == true)
                         yacl_printf("%s ", stream_names[stream]);
                 }
-
                 yacl_printf("\n");
                 break;
 
@@ -423,12 +442,7 @@ static void help_func(cb_lut_t* cb_lut)
                     if (cb_lut->not_null_cbs[action][stream] == true)
                         yacl_printf("%s ", stream_names[stream]);
                 }
-
                 yacl_printf("\n");
-
-            default:
-                // not reachable
-                break;
         }
         yacl_printf("\r");
         stream = STREAM_GPIO;
@@ -441,7 +455,7 @@ static void clear_func()
     vt100_welcome();
 }
 
-static void init_graph(yacl_graph_t *usr_graph)
+static void init_graph(yacl_graph_s *usr_graph)
 {
     if (!usr_graph)
         return;
@@ -453,37 +467,51 @@ static void init_graph(yacl_graph_t *usr_graph)
     g_graph.lower_range = usr_graph->lower_range;
 }
 
-static yacl_error_t call_action_func(cb_lut_t* cb_lut, act_flag_e action, str_flag_e stream, yacl_inout_data_t* inout_data)
+static yacl_error_e call_action_func(cb_lut_t* cb_lut, action_e action, stream_e stream, yacl_inout_data_s* inout_data, yacl_inout_data_s* prev_inout_data, bool use_prev_io_data)
 {
-    if (action == ACTION_CONF)
-    {
-        help_func(cb_lut);
-    }
-    else if (action == ACTION_HELP)
-    {
-        help_func(cb_lut);
-    }
-    else if (action == ACTION_CLEAR)
-    {
-        clear_func();
-    }
-    else if (cb_lut->not_null_cbs[action][stream] == true)
-    {
-        if (action == ACTION_PLOT)
-        {
-            is_plot = true;
-            vt100_draw_graph(&g_graph);
-        }
+	switch (action)
+	{
+	case ACTION_SET:
+		set_func(prev_inout_data, inout_data);
+		return YACL_SUCCESS;
 
-	    cb_lut->funcs[action][stream](inout_data);
-    }
-    else
-    {
-        empty_bufr();
-        vt100_error(yacl_error_desc(YACL_NO_CALLBACK));
+	case ACTION_HELP:
+		help_func(cb_lut);
+		break;
 
-        return YACL_UNKNOWN_CMD;
-    }
+	case ACTION_CLEAR:
+		clear_func();
+		break;
 
+	case ACTION_PLOT:
+		if (cb_lut->not_null_cbs[action][stream] == true)
+		{
+			is_plot = true;
+			vt100_draw_graph(&g_graph);
+		}
+	case ACTION_WRITE:
+	case ACTION_READ:
+		if (cb_lut->not_null_cbs[action][stream] == true)
+		{
+			if (use_prev_io_data == true)
+			{
+				cb_lut->funcs[action][stream](inout_data);
+				set_func(prev_inout_data, inout_data);
+			}
+			else
+			{
+				cb_lut->funcs[action][stream](prev_inout_data);
+				set_func(inout_data, prev_inout_data);
+			}
+		}
+		else
+		{
+			return YACL_UNKNOWN_CMD;
+		}
+		break;
+
+	default:
+		return YACL_UNKNOWN_CMD;
+	}
     return YACL_SUCCESS;
 }

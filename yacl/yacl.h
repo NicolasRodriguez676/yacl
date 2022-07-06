@@ -30,52 +30,45 @@ typedef enum yacl_error {
     YACL_NO_CALLBACK    = 10,
     YACL_PARSE_BAD      = 11,
 
-} yacl_error_t;
+} yacl_error_e;
 
-typedef int (* usr_printf_t)(const char* format, ...);
-typedef int (* usr_snprintf_t)(char* buffer, size_t count, const char* format, ...);
+typedef int (* usr_printf_f)(const char* format, ...);
+typedef int (* usr_snprintf_f)(char* buffer, size_t count, const char* format, ...);
 
 typedef struct usr_print_funcs {
-    usr_printf_t usr_printf;
-    usr_snprintf_t usr_snprintf;
+    usr_printf_f usr_printf;
+    usr_snprintf_f usr_snprintf;
 
-} usr_print_funcs_t;
+} usr_print_funcs_s;
 
 typedef struct yacl_inout_data {
+    uint32_t data[32];
+	uint32_t read_data[32];
+    uint32_t reg[32];
 
-    uint32_t yP_data[32];
-    uint32_t yP_reg[32];
-
-    uint32_t yP_addr;
-    uint32_t yP_state;
-
-    uint32_t bufr[INOUT_BUFR_LEN];
-    uint32_t data;
     uint32_t addr;
-    uint32_t beg_reg;
-    uint32_t end_reg;
-    uint32_t range;
+    uint32_t state;
 
-} yacl_inout_data_t;
+} yacl_inout_data_s;
 
-typedef void (* cb_funcs_t)(yacl_inout_data_t* inout_data);
+typedef void (* cb_funcs_f)(yacl_inout_data_s* inout_data);
 
 typedef struct yacl_usr_callbacks {
-    usr_print_funcs_t usr_print_funcs;
+    usr_print_funcs_s usr_print_funcs;
 
-    cb_funcs_t usr_gpio_read;
-    cb_funcs_t usr_gpio_write;
-    cb_funcs_t usr_gpio_plot;
+    cb_funcs_f usr_gpio_read;
+    cb_funcs_f usr_gpio_write;
+    cb_funcs_f usr_gpio_plot;
 
-    cb_funcs_t usr_i2c_read;
-    cb_funcs_t usr_i2c_write;
-    cb_funcs_t usr_i2c_plot;
+    cb_funcs_f usr_i2c_read;
+    cb_funcs_f usr_i2c_write;
+    cb_funcs_f usr_i2c_plot;
 
-    cb_funcs_t usr_spi_read;
-    cb_funcs_t usr_spi_write;
-    cb_funcs_t usr_spi_plot;
+    cb_funcs_f usr_spi_read;
+    cb_funcs_f usr_spi_write;
+    cb_funcs_f usr_spi_plot;
 
-} yacl_usr_callbacks_t;
+} yacl_usr_callbacks_s;
 
 typedef struct yacl_graph_properties {
     // max number of samples in display  -- uint8_t
@@ -91,18 +84,18 @@ typedef struct yacl_graph_properties {
     // measurement steps                 -- uint32_t
     uint32_t num_steps;
 
-} yacl_graph_t;
+} yacl_graph_s;
 
 //      FUNCTIONS
 
-void yacl_init(yacl_usr_callbacks_t *usr_callbacks, yacl_graph_t *usr_graph);
+void yacl_init(yacl_usr_callbacks_s *usr_callbacks, yacl_graph_s *usr_graph);
 
-yacl_error_t yacl_parse_cmd();
+yacl_error_e yacl_parse_cmd();
 void         yacl_wr_buf(char data);
-yacl_error_t yacl_plot(float data);
+yacl_error_e yacl_plot(float data);
 
-void         yacl_set_cb_null(yacl_usr_callbacks_t* usr_callbacks);
+void         yacl_set_cb_null(yacl_usr_callbacks_s* usr_callbacks);
 
-const char*  yacl_error_desc(yacl_error_t error);
+const char*  yacl_error_desc(yacl_error_e error);
 
 #endif //_YACL_H_

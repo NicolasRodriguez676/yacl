@@ -7,14 +7,14 @@ typedef enum Yacl_Actions {
     ACTION_WRITE = 0,
     ACTION_READ  = 1,
     ACTION_PLOT  = 2,
-    ACTION_CONF  = 3,
+    ACTION_SET   = 3,
     ACTION_HELP  = 4,
     ACTION_CLEAR = 5,
 
     ACTION_NONE  = 0,
     NUM_USR_DEF_ACTIONS  = 3
 
-} act_flag_e;
+} action_e;
 
 typedef enum Yacl_Streams {
     STREAM_NONE = 0,
@@ -24,13 +24,14 @@ typedef enum Yacl_Streams {
 
     NUM_STREAMS  = 3
 
-} str_flag_e;
+} stream_e;
 
 enum Option_Stack_Sizes {
-    OPT_DATA_SIZE   = 32,
-    OPT_REG_SIZE    = 32,
+						  // yacl_inout_data_s
+    OPT_DATA_SIZE   = 32, // data
+    OPT_REG_SIZE    = 32, // reg
     OPT_ADDR_SIZE   = 1,
-    OPT_STATE_SIZE  = 1,
+    OPT_STATE_SIZE  = 1
 };
 
 enum Option_Stack_Offsets {
@@ -40,14 +41,14 @@ enum Option_Stack_Offsets {
     OPT_STATE_OFFSET  = OPT_DATA_SIZE + OPT_REG_SIZE + OPT_STATE_SIZE,
 };
 
-enum Option_Stack_Indexes {
+typedef enum Option_Stack_Indexes {
     OPT_DATA      = 0,
     OPT_REG       = 1,
     OPT_ADDR      = 2,
     OPT_STATE     = 3,
 
     NUM_OPTIONS   = 4
-};
+} opt_stack_idx_e;
 
 typedef struct Option_Data_Stack {
     char** args;
@@ -58,13 +59,10 @@ typedef struct Option_Data_Stack {
 } option_data_stack_s;
 
 typedef struct Walk_Stack {
-    char* bufr_begin;
+	uint32_t bufr_begin;
 
-    // actions
-    act_flag_e action;
-
-    // streams
-    str_flag_e stream;
+    action_e action;
+    stream_e stream;
 
     // options
     bool valid_options[4];
@@ -87,7 +85,7 @@ enum Buffer_Lengths {
 };
 
 typedef struct error_desc {
-    const yacl_error_t code;
+    const yacl_error_e code;
     const char* msg;
 
 } error_desc_t;
@@ -109,10 +107,9 @@ typedef struct data_buffer {
 } data_buffer_t;
 
 typedef struct callback_lut {
-    cb_funcs_t funcs[NUM_USR_DEF_ACTIONS][NUM_STREAMS];
+    cb_funcs_f funcs[NUM_USR_DEF_ACTIONS][NUM_STREAMS];
 
     bool not_null_cbs[NUM_USR_DEF_ACTIONS][NUM_STREAMS];
-    uint32_t num_not_null_cbs;
 
 } cb_lut_t;
 
