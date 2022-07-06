@@ -5,6 +5,7 @@
 #include "yacl.h"
 #include "yacl_types.h"
 
+#include "parser/parser.h"
 #include "vt100/vt100.h"
 
 //      GLOBALS
@@ -12,13 +13,7 @@
 usr_printf_t yacl_printf;
 usr_snprintf_t yacl_snprintf;
 
-static protocol_lut_cb_t g_cmd_cbs = {
-        .protocols = { "gpio", "i2c", "spi", "help" },
-        .actions = { "read", "write", "plot" },
-        .funcs = { { NULL, NULL } },
-        .not_null_cbs = { false },
-        .num_not_null_cbs = 0
-};
+static cb_lut_t g_cb_lut;
 
 static ring_buffer_t g_input_bufr = { .bufr = { 0 }, .head = 0, .tail = 0 };
 
@@ -40,21 +35,24 @@ static yacl_error_t proc_in_bufr();
 static yacl_error_t bufr_chk();
 static void         empty_bufr();
 
-static void         help_func(yacl_inout_data_t* inout_data);
-static void         init_cbs(yacl_usr_callbacks_t* usr_callbacks);
+static void         init_cbs(cb_lut_t* cb_lut, yacl_usr_callbacks_t* usr_callbacks);
+static void         set_callbacks(cb_lut_t* cb_lut, void (**usr_cb)(yacl_inout_data_t *), str_flag_e stream);
 
 static void         init_graph(yacl_graph_t* usr_graph);
 
-/*////////////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
+static void         init_walk_stack(walk_stack_s* walk_stack, option_data_stack_s* option_stack, char** args, uint32_t* base);
+static void         init_option_stack(option_data_stack_s* opt_stack, char** args, uint32_t* base, uint32_t size, uint32_t start);
+static void         get_stack_data(walk_stack_s* stack, yacl_inout_data_t* inout_data);
 
-static void init_walk_stack(walk_stack_s *walk_stack, option_data_stack_s *option_stack, char **args, uint32_t *base);
-static void init_option_stack(option_data_stack_s *opt_stack, char** args, uint32_t* base, uint32_t size, uint32_t start);
+static void         conf_func(cb_lut_t* cb_lut);
+static void         help_func(cb_lut_t* cb_lut);
+static void         clear_func();
 
-/*////////////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
+static yacl_error_t call_action_func(cb_lut_t* cb_lut, act_flag_e action, str_flag_e stream, yacl_inout_data_t* inout_data);
 
 //      PUBLIC      ****************************************************************************************************
 
-void yacl_init(yacl_usr_callbacks_t *usr_callbacks, yacl_graph_t *usr_graph)
+void yacl_init(yacl_usr_callbacks_t* usr_callbacks, yacl_graph_t* usr_graph)
 {
     // assume user provides valid printf functions
     yacl_printf = usr_callbacks->usr_print_funcs.usr_printf;
@@ -62,16 +60,13 @@ void yacl_init(yacl_usr_callbacks_t *usr_callbacks, yacl_graph_t *usr_graph)
 
     // initialize callbacks into protocol lookup table
     // record non-null callbacks as valid
-    init_cbs(usr_callbacks);
+    init_cbs(&g_cb_lut, usr_callbacks);
 
     // set up the graph properties for plotting
     init_graph(usr_graph);
 
-    // clear the VT100 terminal screen
-    vt100_rst_term();
-
     // display welcome message
-    yacl_printf("YACL by Nick\n\n\rExplore peripherals connected to your MCU freely!\n\rType 'help' for more information or visit my GitHub\n\n\r>> ");
+    vt100_welcome();
 }
 
 void yacl_wr_buf(char data)
@@ -96,7 +91,6 @@ void yacl_wr_buf(char data)
 
 yacl_error_t yacl_parse_cmd()
 {
-    /*//////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
     if (g_input_bufr.bufr[(g_input_bufr.head - 1) & 0x7f] != '\n')
         return YACL_NO_CMD;
 
@@ -107,81 +101,24 @@ yacl_error_t yacl_parse_cmd()
     walk_stack_s stack;
     init_walk_stack(&stack, option_stack, stack_args, stack_base);
 
-    if (!yaclG_parse((char*)g_input_bufr.bufr, (char*)g_input_bufr.bufr + g_input_bufr.head, &stack))
+    yacl_error_t error;
+    error = parser((char *) g_input_bufr.bufr, (char *) g_input_bufr.bufr + g_input_bufr.head, &stack);
+
+    if (error != YACL_SUCCESS)
     {
         vt100_yacl_view();
         empty_bufr();
-        return YACL_UNKNOWN_CMD;
+        return error;
     }
 
     yacl_inout_data_t inout_data;
-    option_data_stack_s option;
+    get_stack_data(&stack, &inout_data);
 
-    for (uint32_t i = 0; i < NUM_OPTIONS; ++i)
-    {
-        if (stack.valid_options[i] == false)
-            continue;
-
-        option = stack.options[i];
-
-        if (i == OPT_DATA)
-        {
-            for (uint32_t j = 0; j < option.idx; ++j)
-                inout_data.yP_data[j] = (uint32_t) strtoull(option.args[j], &option.args[j] + strlen(option.args[j]), (int32_t) option.base[j]);
-        }
-        else if (i == OPT_REG)
-        {
-            for (uint32_t j = 0; j < option.idx; ++j)
-                inout_data.yP_reg[j] = (uint32_t) strtoull(option.args[j], &option.args[j] + strlen(option.args[j]), (int32_t) option.base[j]);
-        }
-        else if (i == OPT_ADDR)
-        {
-            inout_data.yP_addr = (uint32_t) strtoull(option.args[0], &option.args[0] + strlen(option.args[0]), (int32_t) option.base[0]);
-        }
-        else if (i == OPT_STATE)
-        {
-            inout_data.yP_state = (uint32_t) strtoull(option.args[0], &option.args[0] + strlen(option.args[0]), (int32_t) option.base[0]);
-        }
-    }
-
-    if (stack.action == ACTION_HELP)
-    {
-        g_cmd_cbs.funcs[HELP_CB_IDX][0](&inout_data);
-
-        empty_bufr();
-        vt100_yacl_view();
-        return YACL_SUCCESS;
-    }
-
-    act_flag_e action = stack.action - 1;
-    str_flag_e stream = stack.stream - 1;
-
-    if (g_cmd_cbs.not_null_cbs[stream] == true)
-    {
-        // verify register range for static inout_data_t buffer
-        // action index for read is zero and write is one
-        // OR allows bypassing inout buffer range, while still
-        // calculating range for write operation
-        if (action == PLOT_CB_IDX)
-        {
-            is_plot = true;
-            vt100_draw_graph(&g_graph);
-        }
-            g_cmd_cbs.funcs[stream][action](&inout_data);
-    }
-    else
-    {
-        empty_bufr();
-        vt100_error(yacl_error_desc(YACL_NO_CALLBACK));
-
-        return YACL_UNKNOWN_CMD;
-    }
+    error = call_action_func(&g_cb_lut, stack.action, stack.stream, &inout_data);
 
     empty_bufr();
     vt100_yacl_view();
-    return YACL_SUCCESS;
-
-    /*//////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
+    return error;
 }
 
 yacl_error_t yacl_plot(float data)
@@ -200,17 +137,17 @@ void yacl_set_cb_null(yacl_usr_callbacks_t* usr_callbacks)
     // help users choose only what they want in their build of this program
     // reduces upkeep in their program and visual clutter
 
-    usr_callbacks->usr_gpio_read = NULL;
+    usr_callbacks->usr_gpio_read  = NULL;
     usr_callbacks->usr_gpio_write = NULL;
-    usr_callbacks->usr_gpio_plot = NULL;
+    usr_callbacks->usr_gpio_plot  = NULL;
 
-    usr_callbacks->usr_i2c_read = NULL;
+    usr_callbacks->usr_i2c_read  = NULL;
     usr_callbacks->usr_i2c_write = NULL;
-    usr_callbacks->usr_i2c_plot = NULL;
+    usr_callbacks->usr_i2c_plot  = NULL;
 
-    usr_callbacks->usr_spi_read = NULL;
+    usr_callbacks->usr_spi_read  = NULL;
     usr_callbacks->usr_spi_write = NULL;
-    usr_callbacks->usr_spi_plot = NULL;
+    usr_callbacks->usr_spi_plot  = NULL;
 }
 
 const char* yacl_error_desc(yacl_error_t error)
@@ -339,56 +276,172 @@ static void empty_bufr()
     g_input_bufr.tail = 0;
 }
 
-static void init_cbs(yacl_usr_callbacks_t* usr_callbacks)
+static void init_cbs(cb_lut_t* cb_lut, yacl_usr_callbacks_t *usr_callbacks)
 {
-    g_cmd_cbs.funcs[HELP_CB_IDX][0] = help_func;
-//	g_cmd_cbs.funcs[HELP_CB_IDX][1] = help_func;
+	cb_funcs_t usr_cb[NUM_STREAMS];
 
-    if (usr_callbacks->usr_gpio_read && usr_callbacks->usr_gpio_write && usr_callbacks->usr_gpio_plot)
+	usr_cb[STREAM_GPIO] = usr_callbacks->usr_gpio_write;
+	usr_cb[STREAM_I2C] = usr_callbacks->usr_gpio_read;
+	usr_cb[STREAM_SPI] = usr_callbacks->usr_gpio_plot;
+	set_callbacks(cb_lut, usr_cb, STREAM_GPIO);
+
+	usr_cb[STREAM_GPIO] = usr_callbacks->usr_i2c_write;
+	usr_cb[STREAM_I2C] = usr_callbacks->usr_i2c_read;
+	usr_cb[STREAM_SPI] = usr_callbacks->usr_i2c_plot;
+	set_callbacks(cb_lut, usr_cb, STREAM_I2C);
+
+	usr_cb[STREAM_GPIO] = usr_callbacks->usr_spi_write;
+	usr_cb[STREAM_I2C] = usr_callbacks->usr_spi_read;
+	usr_cb[STREAM_SPI] = usr_callbacks->usr_spi_plot;
+	set_callbacks(cb_lut, usr_cb, STREAM_SPI);
+}
+
+static void set_callbacks(cb_lut_t* cb_lut, void (**usr_cb)(yacl_inout_data_t *), str_flag_e stream)
+{
+	for (act_flag_e action = ACTION_WRITE; action < NUM_USR_DEF_ACTIONS; ++action)
+	{
+		if (usr_cb[action] != NULL)
+		{
+			cb_lut->funcs[action][stream] = usr_cb[action];
+			cb_lut->not_null_cbs[action][stream] = true;
+		}
+	}
+}
+
+static void init_walk_stack(walk_stack_s *walk_stack, option_data_stack_s *option_stack, char **args, uint32_t *base)
+{
+	walk_stack->action = ACTION_NONE;
+	walk_stack->stream = STREAM_NONE;
+
+	for (uint32_t i = OPT_DATA; i < NUM_OPTIONS; ++i)
+	{
+		walk_stack->valid_options[i] = false;
+		walk_stack->options[i] = option_stack[i];
+	}
+
+	init_option_stack(&walk_stack->options[OPT_DATA],  args, base, OPT_DATA_SIZE,  OPT_DATA_OFFSET );
+	init_option_stack(&walk_stack->options[OPT_REG],   args, base, OPT_REG_SIZE,   OPT_REG_OFFSET  );
+	init_option_stack(&walk_stack->options[OPT_ADDR],  args, base, OPT_ADDR_SIZE,  OPT_ADDR_OFFSET );
+	init_option_stack(&walk_stack->options[OPT_STATE], args, base, OPT_STATE_SIZE, OPT_STATE_OFFSET);
+}
+
+static void init_option_stack(option_data_stack_s *opt_stack, char** args, uint32_t* base, uint32_t size, uint32_t start)
+{
+	opt_stack->args = args + start;
+	opt_stack->base = base + start;
+
+	for (uint32_t i = 0; i < size; ++i)
+	{
+		opt_stack->args[i] = NULL;
+		opt_stack->base[i] = 10;
+	}
+
+	opt_stack->idx = 0;
+}
+
+static void get_stack_data(walk_stack_s* stack, yacl_inout_data_t* inout_data)
+{
+    option_data_stack_s option;
+
+    for (uint32_t i = 0; i < NUM_OPTIONS; ++i)
     {
-        g_cmd_cbs.funcs[GPIO_CB_IDX][READ_CB_IDX] = usr_callbacks->usr_gpio_read;
-        g_cmd_cbs.funcs[GPIO_CB_IDX][WRITE_CB_IDX] = usr_callbacks->usr_gpio_write;
-        g_cmd_cbs.funcs[GPIO_CB_IDX][PLOT_CB_IDX] = usr_callbacks->usr_gpio_plot;
+        if (stack->valid_options[i] == false)
+            continue;
 
-        g_cmd_cbs.not_null_cbs[GPIO_CB_IDX] = true;
-        ++g_cmd_cbs.num_not_null_cbs;
-    }
+        option = stack->options[i];
 
-    if (usr_callbacks->usr_i2c_read && usr_callbacks->usr_i2c_write && usr_callbacks->usr_i2c_plot)
-    {
-        g_cmd_cbs.funcs[I2C_CB_IDX][READ_CB_IDX] = usr_callbacks->usr_i2c_read;
-        g_cmd_cbs.funcs[I2C_CB_IDX][WRITE_CB_IDX] = usr_callbacks->usr_i2c_write;
-        g_cmd_cbs.funcs[I2C_CB_IDX][PLOT_CB_IDX] = usr_callbacks->usr_i2c_plot;
-
-        g_cmd_cbs.not_null_cbs[I2C_CB_IDX] = true;
-        ++g_cmd_cbs.num_not_null_cbs;
-    }
-
-    if (usr_callbacks->usr_spi_read && usr_callbacks->usr_spi_write && usr_callbacks->usr_spi_plot)
-    {
-        g_cmd_cbs.funcs[SPI_CB_IDX][READ_CB_IDX] = usr_callbacks->usr_spi_read;
-        g_cmd_cbs.funcs[SPI_CB_IDX][WRITE_CB_IDX] = usr_callbacks->usr_spi_write;
-        g_cmd_cbs.funcs[SPI_CB_IDX][PLOT_CB_IDX] = usr_callbacks->usr_spi_plot;
-
-        g_cmd_cbs.not_null_cbs[SPI_CB_IDX] = true;
-        ++g_cmd_cbs.num_not_null_cbs;
+        if (i == OPT_DATA)
+        {
+            for (uint32_t j = 0; j < option.idx; ++j)
+                inout_data->yP_data[j] = (uint32_t) strtoull(option.args[j], &option.args[j] + strlen(option.args[j]), (int32_t) option.base[j]);
+        }
+        else if (i == OPT_REG)
+        {
+            for (uint32_t j = 0; j < option.idx; ++j)
+                inout_data->yP_reg[j] = (uint32_t) strtoull(option.args[j], &option.args[j] + strlen(option.args[j]), (int32_t) option.base[j]);
+        }
+        else if (i == OPT_ADDR)
+        {
+            inout_data->yP_addr = (uint32_t) strtoull(option.args[0], &option.args[0] + strlen(option.args[0]), (int32_t) option.base[0]);
+        }
+        else if (i == OPT_STATE)
+        {
+            inout_data->yP_state = (uint32_t) strtoull(option.args[0], &option.args[0] + strlen(option.args[0]), (int32_t) option.base[0]);
+        }
     }
 }
 
-static void help_func(yacl_inout_data_t* inout_data)
+static void help_func(cb_lut_t* cb_lut)
 {
-    yacl_printf("\n\rYACL Help\n\n\r\t<protocol> <action> <addr> <reg> [optional reg end] [data]\n\n\r");
+    yacl_printf("\n\rYACL Help\n\n\r\t<action> <stream> <options>\n\n\r");
 
-    for (uint32_t i = 0; i < NUM_PROTOCOLS; ++i)
+    yacl_printf("\toptions\n\t-d\tdata to pass to callback function\n\r");
+    yacl_printf("\t       \t-r\tspecific register values to pass to callback function\n\r");
+    yacl_printf("\t       \t-s\tstream address to pass to callback function (eg. i2c)\n\r");
+    yacl_printf("\t       \t-w\tconditional value to pass to callback function\n\r");
+
+    yacl_printf("\n\tregistered callbacks (action, streams)\n\n\r");
+
+    char* stream_names[NUM_STREAMS] = { "gpio", "i2c", "spi"};
+
+    act_flag_e action = ACTION_WRITE;
+    str_flag_e stream = STREAM_GPIO;
+
+    for ( ; action < NUM_USR_DEF_ACTIONS; ++action)
     {
-        if (g_cmd_cbs.not_null_cbs[i])
-            yacl_printf("%s :: read + write + plot\n\r", g_cmd_cbs.protocols[i]);
-    }
+        switch (action)
+        {
+            case ACTION_WRITE:
+                yacl_printf("\twrite\t");
 
+                for ( ; stream < NUM_STREAMS; ++stream)
+                {
+                    if (cb_lut->not_null_cbs[action][stream] == true)
+                        yacl_printf("%s ", stream_names[stream]);
+                }
+
+                yacl_printf("\n");
+                break;
+
+            case ACTION_READ:
+                yacl_printf("\tread\t");
+
+                for ( ; stream < NUM_STREAMS; ++stream)
+                {
+                    if (cb_lut->not_null_cbs[action][stream] == true)
+                        yacl_printf("%s ", stream_names[stream]);
+                }
+
+                yacl_printf("\n");
+                break;
+
+            case ACTION_PLOT:
+                yacl_printf("\tplot\t");
+
+                for ( ; stream < NUM_STREAMS; ++stream)
+                {
+                    if (cb_lut->not_null_cbs[action][stream] == true)
+                        yacl_printf("%s ", stream_names[stream]);
+                }
+
+                yacl_printf("\n");
+
+            default:
+                // not reachable
+                break;
+        }
+        yacl_printf("\r");
+        stream = STREAM_GPIO;
+    }
     yacl_printf("\n\r");
 }
 
-void init_graph(yacl_graph_t *usr_graph)
+static void clear_func()
+{
+    vt100_welcome();
+}
+
+static void init_graph(yacl_graph_t *usr_graph)
 {
     if (!usr_graph)
         return;
@@ -400,37 +453,37 @@ void init_graph(yacl_graph_t *usr_graph)
     g_graph.lower_range = usr_graph->lower_range;
 }
 
-/*////////////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
-
-static void init_walk_stack(walk_stack_s *walk_stack, option_data_stack_s *option_stack, char **args, uint32_t *base)
+static yacl_error_t call_action_func(cb_lut_t* cb_lut, act_flag_e action, str_flag_e stream, yacl_inout_data_t* inout_data)
 {
-    walk_stack->action = ACTION_NONE;
-    walk_stack->stream = STREAM_NONE;
-
-    for (uint32_t i = OPT_DATA; i < NUM_OPTIONS; ++i)
+    if (action == ACTION_CONF)
     {
-        walk_stack->valid_options[i] = false;
-        walk_stack->options[i] = option_stack[i];
+        help_func(cb_lut);
+    }
+    else if (action == ACTION_HELP)
+    {
+        help_func(cb_lut);
+    }
+    else if (action == ACTION_CLEAR)
+    {
+        clear_func();
+    }
+    else if (cb_lut->not_null_cbs[action][stream] == true)
+    {
+        if (action == ACTION_PLOT)
+        {
+            is_plot = true;
+            vt100_draw_graph(&g_graph);
+        }
+
+	    cb_lut->funcs[action][stream](inout_data);
+    }
+    else
+    {
+        empty_bufr();
+        vt100_error(yacl_error_desc(YACL_NO_CALLBACK));
+
+        return YACL_UNKNOWN_CMD;
     }
 
-    init_option_stack(&walk_stack->options[OPT_DATA],  args, base, OPT_DATA_SIZE,  OPT_DATA_OFFSET );
-    init_option_stack(&walk_stack->options[OPT_REG],   args, base, OPT_REG_SIZE,   OPT_REG_OFFSET  );
-    init_option_stack(&walk_stack->options[OPT_ADDR],  args, base, OPT_ADDR_SIZE,  OPT_ADDR_OFFSET );
-    init_option_stack(&walk_stack->options[OPT_STATE], args, base, OPT_STATE_SIZE, OPT_STATE_OFFSET);
+    return YACL_SUCCESS;
 }
-
-static void init_option_stack(option_data_stack_s *opt_stack, char** args, uint32_t* base, uint32_t size, uint32_t start)
-{
-    opt_stack->args = args + start;
-    opt_stack->base = base + start;
-
-    for (uint32_t i = 0; i < size; ++i)
-    {
-        opt_stack->args[i] = NULL;
-        opt_stack->base[i] = 10;
-    }
-
-    opt_stack->idx = 0;
-}
-
-/*////////////////////////////////////////////////////////////////////////////////////////////////////////////////////*/
