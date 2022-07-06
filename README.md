@@ -52,13 +52,13 @@ YACL is its own static library that can be installed or compiled within your pro
 2. provide the corresponding protocol functions 
 
 ```C
-void usr_<protocol>_read(yacl_inout_data_t* inout_data);
-void usr_<protocol>_write(yacl_inout_data_t* inout_data);
+void usr_<protocol>_read(yacl_inout_data_s* inout_data);
+void usr_<protocol>_write(yacl_inout_data_s* inout_data);
 ```
 3. make a callback struct, fill in members and initialize
 
 ```C
-yacl_usr_callbacks_t callbacks;
+yacl_usr_callbacks_s callbacks;
 yacl_set_cb_null(&callbacks);       // helper function for ensuring callback validity
 
 callbacks.usr_print_funcs.usr_printf = printf;

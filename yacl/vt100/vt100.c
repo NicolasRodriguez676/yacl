@@ -8,8 +8,8 @@ enum Plot_Buffer_Sizes {
     NUM_VERT_LABELS = 48
 };
 
-extern usr_printf_t yacl_printf;
-extern usr_snprintf_t yacl_snprintf;
+extern usr_printf_f yacl_printf;
+extern usr_snprintf_f yacl_snprintf;
 
 static const char* vt100_esc     = "\x1b";
 static const char* vt100_sve_csr = "\x1b" "7";
@@ -55,7 +55,7 @@ void vt100_backspace()
     yacl_printf("%s%s", vt100_csr_bk, vt100_bk_sp);
 }
 
-float get_step_size(yacl_graph_t* graph)
+float get_step_size(yacl_graph_s* graph)
 {
     float step_size = (graph->upper_range - graph->lower_range) / (float)graph->num_steps;
 
@@ -65,7 +65,7 @@ float get_step_size(yacl_graph_t* graph)
     return step_size;
 }
 
-void vt100_draw_graph(yacl_graph_t* graph)
+void vt100_draw_graph(yacl_graph_s* graph)
 {
     yacl_printf("\n\r");
 
@@ -97,7 +97,7 @@ void vt100_draw_graph(yacl_graph_t* graph)
         yacl_printf("-");
 }
 
-void vt100_plot_graph(yacl_graph_t* graph, float data)
+void vt100_plot_graph(yacl_graph_s* graph, float data)
 {
     float step_size = get_step_size(graph);
     float label_val = graph->lower_range;
@@ -145,7 +145,7 @@ void vt100_plot_graph(yacl_graph_t* graph, float data)
     ++display_count;
 }
 
-void vt100_end_plot(yacl_graph_t* graph)
+void vt100_end_plot(yacl_graph_s* graph)
 {
     display_count = 0;
     yacl_printf("\x1b[%uB\n\n", graph->num_steps + 1);

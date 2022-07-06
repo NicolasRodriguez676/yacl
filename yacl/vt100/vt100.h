@@ -12,8 +12,8 @@ void vt100_error(const char* error_str);
 void vt100_error_data(const char* error_str, uint32_t error_data);
 void vt100_backspace();
 
-void vt100_draw_graph(yacl_graph_t* graph);
-void vt100_plot_graph(yacl_graph_t *graph, float data);
-void vt100_end_plot(yacl_graph_t *graph);
+void vt100_draw_graph(yacl_graph_s* graph);
+void vt100_plot_graph(yacl_graph_s *graph, float data);
+void vt100_end_plot(yacl_graph_s *graph);
 
 #endif //_VT100_H_
