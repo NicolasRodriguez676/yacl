@@ -28,6 +28,7 @@ typedef enum yacl_error {
     YACL_INVALID_ARG    =  8,
     YACL_INOUT_BUFR     =  9,
     YACL_NO_CALLBACK    = 10,
+    YACL_PARSE_BAD      = 11,
 
 } yacl_error_t;
 
