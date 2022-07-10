@@ -36,7 +36,6 @@ void vt100_yacl_view()
 void vt100_error(const char* error_str)
 {
     yacl_printf("\n\rERROR:: %s\n\n\r", error_str);
-
     vt100_yacl_view();
 }
 
@@ -47,12 +46,50 @@ void vt100_error_data(const char* error_str, uint32_t error_data)
     vt100_yacl_view();
 }
 
+void vt100_csr_save()
+{
+	yacl_printf("%s", vt100_sve_csr);
+}
+
+void vt100_csr_restore()
+{
+	yacl_printf("%s", vt100_res_csr);
+}
+
+void vt100_csr_col_one()
+{
+	yacl_printf("\x1b[1G");
+}
+
+void vt100_csr_upward(uint8_t steps)
+{
+	yacl_printf("\x1b[%uA", steps);
+}
+
+void vt100_csr_downward(uint8_t steps)
+{
+	yacl_printf("\x1b[%uB", steps);
+}
+
+void vt100_csr_backward(uint8_t steps)
+{
+	yacl_printf("\x1b[%uD", steps);
+}
+
+void vt100_csr_forward(uint8_t steps)
+{
+	yacl_printf("\x1b[%uC", steps);
+}
+
+void v100_erase_current_line()
+{
+	yacl_printf("\x1b[2K");
+}
+
 void vt100_backspace()
 {
-    char* vt100_bk_sp = "\x1b[1P";
-    char* vt100_csr_bk = "\x1b[1D";
-
-    yacl_printf("%s%s", vt100_csr_bk, vt100_bk_sp);
+	vt100_csr_backward(2);
+	yacl_printf("\x1b[1P");
 }
 
 float get_step_size(yacl_graph_s* graph)

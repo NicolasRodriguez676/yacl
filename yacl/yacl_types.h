@@ -47,6 +47,7 @@ typedef enum Option_Stack_Indexes {
     OPT_ADDR      = 2,
     OPT_STATE     = 3,
 
+	OPT_NONE      = 0,
     NUM_OPTIONS   = 4
 } opt_stack_idx_e;
 
@@ -73,15 +74,19 @@ typedef struct Walk_Stack {
 enum Control_Characters {
     DELIM_SPACE         = 32,
     DELIM_NEWLINE       = 10,
-    CNTRL_BACKSPACE     = 127,
+    TERM_ESC            = 27,
+    TERM_CSI            = '[',
+    TERM_CSR_LEFT       = 'D',
+    TERM_CSR_RIGHT      = 'C',
+	TERM_SEQ_LEN        = 3,
+	TERM_BACKSPACE      = 127,
     EXIT_PLOT           = 'q'
 };
 
-enum Buffer_Lengths {
-    MAX_DATA_LEN     = 128,
-    MAX_TOKEN_LEN    = 16,
-    MAX_TOKENS       = 6,
-    TOKENS_LEN_IDX   = 15
+enum Buffer_Attributes {
+    USER_INPUT_LEN   = 256,
+    INPUT_DATA_LEN   = 32,
+    INPUT_BUFR_MASK  = 0x1f
 };
 
 typedef struct error_desc {
@@ -91,26 +96,23 @@ typedef struct error_desc {
 } error_desc_t;
 
 typedef struct ring_buffer {
-    uint8_t bufr[MAX_DATA_LEN];
-    uint32_t head;
-    uint32_t tail;
+    uint8_t bufr[INPUT_DATA_LEN];
+    uint8_t head;
+    uint8_t tail;
+    bool overrun;
 
-} ring_buffer_t;
+} ring_buffer_s;
 
-typedef struct data_buffer {
-    uint8_t bufr[MAX_TOKEN_LEN * MAX_TOKENS];
-    uint32_t idx;
+typedef struct user_input_string {
+	uint8_t bufr[USER_INPUT_LEN];
+	uint8_t index;
+	uint32_t cursor;
 
-    uint8_t* tok_array[MAX_TOKENS];
-    uint32_t tok_cnt;
-
-} data_buffer_t;
+} user_input_string_s;
 
 typedef struct callback_lut {
     cb_funcs_f funcs[NUM_USR_DEF_ACTIONS][NUM_STREAMS];
 
-    bool not_null_cbs[NUM_USR_DEF_ACTIONS][NUM_STREAMS];
-
-} cb_lut_t;
+} cb_lut_s;
 
 #endif //_YACL_TYPES_H_

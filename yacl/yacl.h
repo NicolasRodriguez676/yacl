@@ -20,15 +20,9 @@ typedef enum yacl_error {
     YACL_SUCCESS        =  0,
     YACL_UNKNOWN_CMD    =  1,
     YACL_NO_CMD         =  2,
-    YACL_BUF_FULL       =  3,
-    YACL_BUFRS_EMPTD    =  4,
-    YACL_ARG_OVRN       =  5,
-    YACL_TOO_MANY_ARGS  =  6,
-    YACL_NOT_ENUF_ARGS  =  7,
-    YACL_INVALID_ARG    =  8,
-    YACL_INOUT_BUFR     =  9,
-    YACL_NO_CALLBACK    = 10,
-    YACL_PARSE_BAD      = 11,
+    YACL_USR_INPUT_FULL =  3,
+    YACL_NO_CALLBACK    =  4,
+    YACL_PARSE_BAD      =  5
 
 } yacl_error_e;
 

@@ -2,7 +2,7 @@
 
 #include "parser.h"
 
-extern usr_printf_t yacl_printf;
+extern usr_printf_f yacl_printf;
 
 %%{
     machine yacl_parser;
@@ -97,7 +97,7 @@ extern usr_printf_t yacl_printf;
 #*** YACL PARSER DATA -----------------------------------------------------------------------------------------------
     
     data        = ((hex_prefix %*xdata_ent) . (xdigit+ >data_ent %data_ext)) | (digit+ >data_ent %data_ext);
-    array       = ",". data . terminator?;
+    array       = "," . " "? . data . terminator?;
     data_single = data . (" "? | terminator?);
     data_array  = data . terminator? . array+;
 
@@ -149,7 +149,7 @@ extern usr_printf_t yacl_printf;
     write data;
 }%%
 
-yacl_error_t parser(char* p, char* pe, walk_stack_s* stack)
+yacl_error_e parser(char* p, char* pe, walk_stack_s* stack)
 {
     int cs = 0;
     %% write init;
