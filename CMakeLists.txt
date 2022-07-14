@@ -1,12 +1,9 @@
 cmake_minimum_required(VERSION 3.22)
 
-option(BUILD-STM32 "build library using gcc toolchain for STM32" ON)
-option(BUILD-STM32F4 "build library using stm32f4 compile options" ON)
-option(INSTALL-YACL "make an install target" ON)
+option(BUILD_FOR_STM32F4 "build library using stm32f4 compile options" ON)
+option(INSTALL_YACL      "install YACL on host machine"                ON)
 
-if (${BUILD-STM32})
-    set(CMAKE_TOOLCHAIN_FILE $ENV{CMAKE_STM32_SCRIPTS}/stm32_gcc.cmake)
-endif()
+set(CMAKE_TOOLCHAIN_FILE $ENV{CMAKE_STM32_SCRIPTS}/stm32_gcc.cmake)
 
 if (DEFINED ENV{EMBEDDED_LIBS})
     set(CMAKE_INSTALL_PREFIX $ENV{EMBEDDED_LIBS})
@@ -17,8 +14,8 @@ project(YACL
             C
             ASM
         VERSION
-            0.4)
-
+            1.0
+        )
 
 add_subdirectory(yacl)
 
