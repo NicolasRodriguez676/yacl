@@ -4,92 +4,79 @@
 // https://vt100.net/docs/vt102-ug/appendixc.html
 // https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h3-Application-Program-Command-functions
 
-enum Plot_Buffer_Sizes {
-    NUM_VERT_LABELS = 48
-};
-
 extern usr_printf_f yacl_printf;
 extern usr_snprintf_f yacl_snprintf;
 
-static const char* vt100_esc     = "\x1b";
-static const char* vt100_sve_csr = "\x1b" "7";
-static const char* vt100_res_csr = "\x1b" "8";
-
-static uint32_t display_count = 0;
-
 void vt100_welcome()
 {
-    vt100_rst_term();
-    yacl_printf("YACL by Nick\n\n\rExplore peripherals connected to your MCU freely!\n\rType 'help' for more information or visit my GitHub\n\n\r>> ");
-}
-
-void vt100_rst_term()
-{
-    yacl_printf("\x1b[2J");
+	vt100_erase_current_line();
+	vt100_clear_display();
+    yacl_printf("\x1b\x63YACL by Nick\n\n\rExplore peripherals connected to your MCU freely!\n\rType 'help' for more information or visit my GitHub\n\n\r>> ");
 }
 
 void vt100_yacl_view()
 {
-    yacl_printf("\r>> ");
+	yacl_printf("\n\r>> ");
 }
 
-void vt100_error(const char* error_str)
+void vt100_report_exact_error(walk_stack_s* stack, yacl_error_e error)
 {
-    yacl_printf("\n\rERROR:: %s\n\n\r", error_str);
-    vt100_yacl_view();
+	if (stack->bufr_err_beg + 1 == stack->bufr_err_idx)
+		yacl_printf("\x1b[1B\x1b[%uC\x1b[32m~%s\n%s\n", stack->bufr_err_beg + 3, "\x1b[31m^\x1b[0m\n\r", yacl_error_desc(error));
+	else if (stack->bufr_err_beg == stack->bufr_err_idx)
+		yacl_printf("\x1b[1B\x1b[%uC\x1b[32m~%s\n%s\n", stack->bufr_err_beg + 2, "\x1b[31m^\x1b[0m\n\r", yacl_error_desc(error));
+	else
+		yacl_printf("\x1b[1B\x1b[%uC\x1b[32m~\x1b[%ub%s\n%s\n", stack->bufr_err_beg + 4, (stack->bufr_err_idx - 1) - (stack->bufr_err_beg + 1), "\x1b[31m^\x1b[0m\n\r", yacl_error_desc(error));
 }
 
-void vt100_error_data(const char* error_str, uint32_t error_data)
+void vt100_clear_display()
 {
-    yacl_printf("\n\rERROR:: %s - %d\n\n\r", error_str, error_data);
-
-    vt100_yacl_view();
+    yacl_printf("\x1b[2J");
 }
 
-void vt100_csr_save()
-{
-	yacl_printf("%s", vt100_sve_csr);
-}
-
-void vt100_csr_restore()
-{
-	yacl_printf("%s", vt100_res_csr);
-}
-
-void vt100_csr_col_one()
-{
-	yacl_printf("\x1b[1G");
-}
-
-void vt100_csr_upward(uint8_t steps)
-{
-	yacl_printf("\x1b[%uA", steps);
-}
-
-void vt100_csr_downward(uint8_t steps)
-{
-	yacl_printf("\x1b[%uB", steps);
-}
-
-void vt100_csr_backward(uint8_t steps)
-{
-	yacl_printf("\x1b[%uD", steps);
-}
-
-void vt100_csr_forward(uint8_t steps)
-{
-	yacl_printf("\x1b[%uC", steps);
-}
-
-void v100_erase_current_line()
+void vt100_erase_current_line()
 {
 	yacl_printf("\x1b[2K");
 }
 
 void vt100_backspace()
 {
-	vt100_csr_backward(2);
 	yacl_printf("\x1b[1P");
+}
+
+void vt100_cursor_save()
+{
+	yacl_printf("\x1b\x37");
+}
+
+void vt100_cursor_restore()
+{
+	yacl_printf("\x1b\x37");
+}
+
+void vt100_cursor_column_begin()
+{
+	yacl_printf("\x1b[1G");
+}
+
+void vt100_cursor_upward(uint8_t steps)
+{
+	yacl_printf("\x1b[%uA", steps);
+}
+
+void vt100_cursor_downward(uint8_t steps)
+{
+	yacl_printf("\x1b[%uB", steps);
+}
+
+void vt100_cursor_backward(uint8_t steps)
+{
+	yacl_printf("\x1b[%uD", steps);
+}
+
+void vt100_cursor_forward(uint8_t steps)
+{
+	yacl_printf("\x1b[%uC", steps);
 }
 
 float get_step_size(yacl_graph_s* graph)
@@ -104,41 +91,32 @@ float get_step_size(yacl_graph_s* graph)
 
 void vt100_draw_graph(yacl_graph_s* graph)
 {
-    yacl_printf("\n\r");
+	vt100_clear_display();
 
-    char graph_fill_blanks[24] = { '\0' };
-    yacl_snprintf(graph_fill_blanks, sizeof(graph_fill_blanks), "\x1b[1D\x1b[%u@\x1b[%uC", graph->num_samples, graph->num_samples + 1);
-
-    char graph_vt_labels[NUM_VERT_LABELS][8] = { {'\0'} };
-
-    float step_size = get_step_size(graph);
-    float label_val = graph->lower_range;
-
-    for (uint32_t i = 0; i <= graph->num_steps; ++i)
-    {
-        yacl_snprintf(graph_vt_labels[i], sizeof(graph_vt_labels) / sizeof(graph_vt_labels[0][0]), "%.3f", label_val);
-        label_val += step_size;
-    }
-
-    yacl_printf(" ");
-    for (uint8_t i = 0; i < graph->num_samples; ++i)
-        yacl_printf("_");
-
-    yacl_printf("\n\r|%s7|%s %s%s\n\r", vt100_esc, graph_fill_blanks, graph_vt_labels[graph->num_steps], graph->units);
-
-    for (uint32_t i = 1; i <= graph->num_steps; ++i)
-        yacl_printf("||%s %s%s\n\r", graph_fill_blanks,  graph_vt_labels[(graph->num_steps) - i], graph->units);
-
-    yacl_printf(" ");
-    for (uint8_t i = 0; i < graph->num_samples; ++i)
-        yacl_printf("-");
+	// top
+	yacl_printf("\x1b\x63\x1b[1B\x1b[35m\xe2\x94\x8f\xe2\x94\x81\x1b[%ub\xe2\x94\x93", graph->num_samples);
+	
+	// middle
+	float step_size = get_step_size(graph) - 0.00001f; // ensure zero is shown as zero. not negative zero
+	float label_val = graph->upper_range;
+	
+	for (uint32_t i = 0; i <= graph->num_steps; ++i)
+	{
+		yacl_printf("\x1b[1G\x1b[1B\xe2\x94\x83\x20\x1b[%ub\xe2\x94\x83 %.3f%s", graph->num_samples, label_val, graph->units);
+		label_val -= step_size;
+	}
+	
+	// bottom
+	yacl_printf("\x1b[1G\x1b[1B\xe2\x94\x97\xe2\x94\x81\x1b[%ub\xe2\x94\x9b\x1b[0m", graph->num_samples);
+	
+	// 2 down, 1 right -> origin (2D, 1R)
+	yacl_printf("\x1b[1;1f");
 }
 
 void vt100_plot_graph(yacl_graph_s* graph, float data)
 {
     float step_size = get_step_size(graph);
     float label_val = graph->lower_range;
-
     uint32_t column = graph->num_steps;
 
     do
@@ -148,42 +126,35 @@ void vt100_plot_graph(yacl_graph_s* graph, float data)
         label_val += step_size;
 
     } while (--column);
-
-    if (display_count == graph->num_samples)
-    {
-        --display_count;
-        char move_display[48] = { '\0' };
-
-        yacl_snprintf(move_display, sizeof(move_display)/sizeof(move_display[0]), "\r\x1b[1C\x1b[1P\x1b[%uC\x1b[1P\x1b[2@\x1b[1B", graph->num_samples - 2);
-
-        yacl_printf("%s", vt100_res_csr);
-
-        for (uint32_t i = 0; i <= graph->num_steps; ++i)
-            yacl_printf("%s", move_display);
-
-        yacl_printf("\x1b[%uA%s", graph->num_steps + 1, vt100_sve_csr);
-    }
-
-    if (!column)
-    {
-        yacl_printf("%s8*%s7", vt100_esc, vt100_esc);
-        ++display_count;
-        return;
-    }
-
-    char plot_mv_vt_dw[8] = { 0 };
-    char plot_mv_vt_up[8] = { 0 };
-
-    yacl_snprintf(plot_mv_vt_dw, sizeof(plot_mv_vt_dw), "\x1b[%uB", column);
-    yacl_snprintf(plot_mv_vt_up, sizeof(plot_mv_vt_up), "\x1b[%uA", column);
-
-    yacl_printf("%s8%s*%s%s7", vt100_esc, plot_mv_vt_dw, plot_mv_vt_up, vt100_esc);
-
-    ++display_count;
+	
+	yacl_printf("\x1b[36m");
+	
+	if (graph->display_count > graph->num_samples)
+	{
+		for (uint32_t i = 0; i <= graph->num_steps; ++i)
+		{
+			// erase left side. pulls the graph to the left
+			// go the right to insert the data point
+			yacl_printf("\x1b[%uB\x1b[1C\x1b[1P\x1b[%uC", 2 + i, graph->num_samples - 1);
+			
+			// data point only happens once
+			if (i == column)
+				yacl_printf("\xe2\x97\x8f");
+			
+			// push right side labels to the right
+			// reset cursor to (1,1)
+			yacl_printf("\x1b[1@\x1b[1;1f");
+		}
+	}
+	else
+	{
+		yacl_printf("\x1b[%uB\x1b[%uC\xe2\x97\x8f\x1b[1;1f", 2 + column, 1 + graph->display_count);
+		++graph->display_count;
+	}
 }
 
 void vt100_end_plot(yacl_graph_s* graph)
 {
-    display_count = 0;
-    yacl_printf("\x1b[%uB\n\n", graph->num_steps + 1);
+    graph->display_count = 0;
+    yacl_printf("\x1b[0m\x1b[%uB\x1b[1G", graph->num_steps + 3);
 }

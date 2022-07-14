@@ -16,21 +16,16 @@ usr_snprintf_f yacl_snprintf;
 static cb_lut_s g_cb_lut;
 static yacl_inout_data_s g_prev_inout_data;
 
-static ring_buffer_s g_input_bufr = { .bufr = { 0 }, .head = 0, .tail = 0, .overrun = false };
-static user_input_string_s g_usr_input = { .bufr = { 0 }, .index = 0, .cursor = 0 };
+static ring_buffer_s g_input_bufr;
+static user_input_string_s g_usr_input;
 
-static bool is_plot = false;
-
-static yacl_graph_s g_graph = {
-	.upper_range = 1.0f,
-	.lower_range = 0.0f,
-	.num_steps   = 11,
-	.num_samples = 60,
-	.units       = "V",
-};
+static bool g_is_plot;
+static yacl_graph_s g_graph;
 
 //      FUNCTION PROTOTYPES
 
+static void init_input_bufr(ring_buffer_s* input_bufr);
+static void init_usr_input_bufr(user_input_string_s* usr_input);
 static void init_graph(yacl_graph_s* usr_graph);
 
 static yacl_error_e preproc_input_bufr(ring_buffer_s* input_bufr, user_input_string_s* usr_input);
@@ -45,7 +40,7 @@ static void set_callbacks(cb_lut_s* cb_lut, void (** usr_cb)(yacl_inout_data_s*)
 
 static void init_walk_stack(walk_stack_s* walk_stack, option_data_stack_s* option_stack, char** args, uint32_t* base);
 static void init_option_stack(option_data_stack_s* opt_stack, char** args, uint32_t* base, uint32_t size, uint32_t start);
-static bool get_stack_data(walk_stack_s* stack, yacl_inout_data_s* inout_data);
+static bool get_stack_data(walk_stack_s* stack, yacl_inout_data_s* inout_data, yacl_graph_s* graph);
 
 static void set_func(yacl_inout_data_s* prev_inout_data, yacl_inout_data_s* inout_data);
 static void help_func(cb_lut_s* cb_lut);
@@ -65,7 +60,12 @@ void yacl_init(yacl_usr_callbacks_s* usr_callbacks, yacl_graph_s* usr_graph)
 	// record non-null callbacks as valid
 	init_cbs(&g_cb_lut, usr_callbacks);
 	
+	// initialize buffers
+	init_input_bufr(&g_input_bufr);
+	init_usr_input_bufr(&g_usr_input);
+	
 	// set up the graph properties for plotting
+	g_is_plot = false;
 	init_graph(usr_graph);
 	
 	vt100_welcome();
@@ -73,10 +73,10 @@ void yacl_init(yacl_usr_callbacks_s* usr_callbacks, yacl_graph_s* usr_graph)
 
 void yacl_wr_buf(char data)
 {
-	if (is_plot)
+	if (g_is_plot)
 	{
 		if (data == EXIT_PLOT)
-			is_plot = false;
+			g_is_plot = false;
 		return;
 	}
 	
@@ -96,13 +96,29 @@ yacl_error_e yacl_parse_cmd()
 	yacl_error_e error = preproc_input_bufr(&g_input_bufr, &g_usr_input);
 	
 	if (error != YACL_SUCCESS)
+	{
+		if ( error == YACL_USR_INPUT_FULL)
+		{
+			yacl_printf("\n\r%s", yacl_error_desc(YACL_USR_INPUT_FULL));
+			empty_input_bufr(&g_input_bufr);
+			empty_usr_str_bufr(&g_usr_input);
+			vt100_yacl_view();
+		}
 		return error;
+	}
 	
-	v100_erase_current_line();
+	if (g_usr_input.bufr[0] == ASCII_CR)
+	{
+		vt100_yacl_view();
+		empty_input_bufr(&g_input_bufr);
+		empty_usr_str_bufr(&g_usr_input);
+		return YACL_NO_CMD;
+	}
+	
 	strip_spaces(&g_usr_input);
 	
-	char* stack_args[OPT_DATA_SIZE + OPT_REG_SIZE + OPT_ADDR_SIZE + OPT_STATE_SIZE];
-	uint32_t stack_base[OPT_DATA_SIZE + OPT_REG_SIZE + OPT_ADDR_SIZE + OPT_STATE_SIZE];
+	char* stack_args[OPT_STACK_SIZE];
+	uint32_t stack_base[OPT_STACK_SIZE];
 	option_data_stack_s option_stack[NUM_OPTIONS];
 	
 	walk_stack_s stack;
@@ -112,18 +128,19 @@ yacl_error_e yacl_parse_cmd()
 	
 	if (error != YACL_SUCCESS)
 	{
+		vt100_report_exact_error(&stack, error);
 		vt100_yacl_view();
 		empty_usr_str_bufr(&g_usr_input);
 		return error;
 	}
 	
 	yacl_inout_data_s inout_data;
-	bool data_present = get_stack_data(&stack, &inout_data);
-	
+	bool data_present = get_stack_data(&stack, &inout_data, &g_graph);
+
 	error = call_action_func(&g_cb_lut, &stack, &g_usr_input, &inout_data, &g_prev_inout_data, data_present);
-	
+
 	if (error != YACL_SUCCESS)
-		vt100_error(yacl_error_desc(error));
+		yacl_printf("\n\r%s", yacl_error_desc(error));
 	
 	vt100_yacl_view();
 	empty_usr_str_bufr(&g_usr_input);
@@ -132,7 +149,7 @@ yacl_error_e yacl_parse_cmd()
 
 yacl_error_e yacl_plot(float data)
 {
-	if (is_plot)
+	if (g_is_plot)
 	{
 		vt100_plot_graph(&g_graph, data);
 		return YACL_SUCCESS;
@@ -164,12 +181,15 @@ void yacl_set_cb_null(yacl_usr_callbacks_s* usr_callbacks)
 const char* yacl_error_desc(yacl_error_e error)
 {
 	static const error_desc_t error_desc[] = {
-		{ YACL_SUCCESS,         "no errors. good to go"                     },
-		{ YACL_UNKNOWN_CMD,     "command was not found in given commands"   },
-		{ YACL_NO_CMD,          "command incomplete"                        },
-		{ YACL_USR_INPUT_FULL,  "user input buffer full. restarting"        },
-		{ YACL_NO_CALLBACK,     "command was not given a callback function" },
-		{ YACL_PARSE_BAD,       "parsing input command failed"              },
+		{ YACL_SUCCESS,         "no errors. good to go"                             },
+		{ YACL_UNKNOWN_CMD,     "command was not found in given commands"           },
+		{ YACL_NO_CMD,          "command incomplete"                                },
+		{ YACL_USR_INPUT_FULL,  "user input buffer full. restarting"                },
+		{ YACL_NO_CALLBACK,     "command was not given a callback function"         },
+		{ YACL_TOO_MANY_ARGS,   "error parsing. too many arguments for option"      },
+		{ YACL_ARG_TOO_LARGE,   "error parsing. argument numerical value too large" },
+		{ YACL_ARG_TOO_LONG,    "error parsing. unit string length max is 8"        },
+		{ YACL_PARSE_BAD,       "error parsing. misspelled or unknown argument"     }
 	};
 	
 	return error_desc[error].msg;
@@ -194,7 +214,7 @@ static yacl_error_e preproc_input_bufr(ring_buffer_s* input_bufr, user_input_str
 		
 		switch (data)
 		{
-		case DELIM_NEWLINE:
+		case ASCII_CR:
 			usr_input->bufr[usr_input->index++] = data;
 			return YACL_SUCCESS;
 			
@@ -219,7 +239,7 @@ static yacl_error_e preproc_input_bufr(ring_buffer_s* input_bufr, user_input_str
 			// prevent cursor moving into yacl view on screen
 			// move user string buffer cursor left
 			if (usr_input->cursor == 0)
-				vt100_csr_forward(1);
+				vt100_cursor_forward(1);
 			else if (usr_input->cursor > 0)
 				--usr_input->cursor;
 			
@@ -233,7 +253,7 @@ static yacl_error_e preproc_input_bufr(ring_buffer_s* input_bufr, user_input_str
 			// prevent cursor moving past user string buffer index
 			// move buffer cursor right, if not at user string buffer index
 			if (usr_input->index == usr_input->cursor)
-				vt100_csr_backward(1);
+				vt100_cursor_backward(1);
 			else
 				++usr_input->cursor;
 			
@@ -262,25 +282,28 @@ static yacl_error_e preproc_input_bufr(ring_buffer_s* input_bufr, user_input_str
 		case '\\':
 			// internal status message meant for debugging. may use for displaying inout_data
 			// as of this implementation, target MCU echo is used. does not echo back this character
-			vt100_csr_save();
-			vt100_csr_downward(1);
-			v100_erase_current_line();
-			yacl_printf("\rSTATUS index=%u, pos=%u, bufr=\"%s\"", usr_input->index, usr_input->cursor, usr_input->bufr);
-			vt100_csr_restore();
+			vt100_cursor_save();
+			yacl_printf("\x1b[50;1f\x1b[2K\x1b[47m\x1b[30m"
+						"STATUS index=\x1b[36m%u\x1b[30m, "
+						"pos=\x1b[36m%u\x1b[30m, "
+						"step=\x1b[36m%u\x1b[30m, "
+						"sample=\x1b[36m%u\x1b[30m, "
+						"upper=\x1b[36m%.3f\x1b[30m, "
+						"lower=\x1b[36m%.3f\x1b[30m, "
+						"units=\"\x1b[36m%s\x1b[30m\", "
+						"bufr=\"\x1b[36m%s\x1b[30m\""
+						"\x1b[0m", usr_input->index, usr_input->cursor, g_graph.num_steps, g_graph.num_samples, g_graph.upper_range, g_graph.lower_range, g_graph.units, usr_input->bufr);
+			
+			vt100_cursor_restore();
 			break;
 		
 		default:
 			// potential issue. should not be needed
 			// is_esc = false;
 			
-			// last entry must be a newline and null terminated
+			// last entry must be a carriage return and null terminated
 			if (usr_input->index == (USER_INPUT_LEN - 2))
-			{
-				vt100_error(yacl_error_desc(YACL_USR_INPUT_FULL));
-				empty_input_bufr(input_bufr);
-				empty_usr_str_bufr(usr_input);
 				return YACL_USR_INPUT_FULL;
-			}
 			
 			// if cursor is not at index. writing to user string buffer will
 			// copy the user string buffer one byte to the right, from the cursor
@@ -292,10 +315,10 @@ static yacl_error_e preproc_input_bufr(ring_buffer_s* input_bufr, user_input_str
 				usr_input->bufr[usr_input->cursor++] = data;
 				++usr_input->index;
 				
-				vt100_csr_save();
-				v100_erase_current_line();
+				vt100_cursor_save();
+				vt100_erase_current_line();
 				yacl_printf("\r>> %s", usr_input->bufr);
-				vt100_csr_restore();
+				vt100_cursor_restore();
 				break;
 			}
 			
@@ -321,7 +344,7 @@ static uint32_t get_bufr_unread(ring_buffer_s* input_bufr)
 
 static void empty_input_bufr(ring_buffer_s* input_bufr)
 {
-	memset(input_bufr->bufr, 0, USER_INPUT_LEN);
+	memset(input_bufr->bufr, 0, INPUT_DATA_LEN);
 	
 	input_bufr->head = 0;
 	input_bufr->tail = 0;
@@ -338,7 +361,7 @@ static void empty_usr_str_bufr(user_input_string_s* usr_input)
 
 static void init_cbs(cb_lut_s* cb_lut, yacl_usr_callbacks_s* usr_callbacks)
 {
-	cb_funcs_f usr_cb[NUM_STREAMS];
+	yacl_cb_funcs_f usr_cb[NUM_STREAMS];
 	
 	usr_cb[STREAM_GPIO] = usr_callbacks->usr_gpio_write;
 	usr_cb[STREAM_I2C] = usr_callbacks->usr_gpio_read;
@@ -370,16 +393,22 @@ static void init_walk_stack(walk_stack_s* walk_stack, option_data_stack_s* optio
 	walk_stack->action = ACTION_NONE;
 	walk_stack->stream = STREAM_NONE;
 	
-	for (opt_stack_idx_e i = OPT_DATA; i < NUM_OPTIONS; ++i)
+	for (option_stack_index_e i = OPT_NONE; i < NUM_OPTIONS; ++i)
 	{
 		walk_stack->valid_options[i] = false;
 		walk_stack->options[i] = option_stack[i];
 	}
 	
-	init_option_stack(&walk_stack->options[OPT_DATA],  args, base, OPT_DATA_SIZE, OPT_DATA_OFFSET  );
-	init_option_stack(&walk_stack->options[OPT_REG],   args, base, OPT_REG_SIZE, OPT_REG_OFFSET    );
-	init_option_stack(&walk_stack->options[OPT_ADDR],  args, base, OPT_ADDR_SIZE, OPT_ADDR_OFFSET  );
+	init_option_stack(&walk_stack->options[OPT_DATA],  args, base, OPT_DATA_SIZE,  OPT_DATA_OFFSET );
+	init_option_stack(&walk_stack->options[OPT_REG],   args, base, OPT_REG_SIZE,   OPT_REG_OFFSET  );
+	init_option_stack(&walk_stack->options[OPT_ADDR],  args, base, OPT_ADDR_SIZE,  OPT_ADDR_OFFSET );
 	init_option_stack(&walk_stack->options[OPT_STATE], args, base, OPT_STATE_SIZE, OPT_STATE_OFFSET);
+	
+	init_option_stack(&walk_stack->options[OPT_UPPER_BOUND], args, base, OPT_UPPER_SIZE, OPT_UPPER_OFFSET);
+	init_option_stack(&walk_stack->options[OPT_LOWER_BOUND], args, base, OPT_LOWER_SIZE, OPT_LOWER_OFFSET);
+	init_option_stack(&walk_stack->options[OPT_NUM_SAMPLES], args, base, OPT_NSMPL_SIZE, OPT_NSMPL_OFFSET);
+	init_option_stack(&walk_stack->options[OPT_NUM_STEPS],   args, base, OPT_NSTPS_SIZE, OPT_NSTPS_OFFSET);
+	init_option_stack(&walk_stack->options[OPT_UNITS],       args, base, OPT_UNITS_SIZE, OPT_UNITS_OFFSET);
 }
 
 static void init_option_stack(option_data_stack_s* opt_stack, char** args, uint32_t* base, uint32_t size, uint32_t start)
@@ -395,44 +424,59 @@ static void init_option_stack(option_data_stack_s* opt_stack, char** args, uint3
 	opt_stack->idx = 0;
 }
 
-static bool get_stack_data(walk_stack_s* stack, yacl_inout_data_s* inout_data)
+static bool get_stack_data(walk_stack_s* stack, yacl_inout_data_s* inout_data, yacl_graph_s* graph)
 {
 	bool option_data_present = false;
-	option_data_stack_s option;
+	option_data_stack_s* option;
 	
-	// is this the most readable way to do this?
-	for (opt_stack_idx_e i = OPT_NONE; i < NUM_OPTIONS; ++i)
+	for (option_stack_index_e i = OPT_NONE; i < NUM_OPTIONS; ++i)
 	{
 		if (stack->valid_options[i] == false)
 			continue;
 		
-		option = stack->options[i];
+		option = &stack->options[i];
+		option_data_present = true;
 		
 		switch (i)
 		{
 		case OPT_DATA:
-			option_data_present = true;
-
-			for (uint32_t j = 0; j < option.idx; ++j)
-				inout_data->data[j] = (uint32_t)strtoull(option.args[j], &option.args[j] + strlen(option.args[j]), (int32_t)option.base[j]);
+			for (uint32_t j = 0; j < option->idx; ++j)
+				inout_data->data[j] = (uint32_t)strtoull(option->args[j], &option->args[j] + strlen(option->args[j]), (int32_t)option->base[j]);
 			break;
 		
 		case OPT_REG:
-			option_data_present = true;
-
-			for (uint32_t j = 0; j < option.idx; ++j)
-				inout_data->reg[j] = (uint32_t)strtoull(option.args[j], &option.args[j] + strlen(option.args[j]), (int32_t)option.base[j]);
+			for (uint32_t j = 0; j < option->idx; ++j)
+				inout_data->reg[j] = (uint32_t)strtoull(option->args[j], &option->args[j] + strlen(option->args[j]), (int32_t)option->base[j]);
 			break;
 		
 		case OPT_ADDR:
-			option_data_present = true;
-			inout_data->addr = (uint32_t)strtoull(option.args[OPT_NONE], &option.args[OPT_NONE] + strlen(option.args[OPT_NONE]), (int32_t)option.base[OPT_NONE]);
+			inout_data->addr = (uint32_t)strtoull(option->args[OPT_NONE], &option->args[OPT_NONE] + strlen(option->args[OPT_NONE]), (int32_t)option->base[OPT_NONE]);
 			break;
 		
 		case OPT_STATE:
-			option_data_present = true;
-			inout_data->state = (uint32_t)strtoull(option.args[OPT_NONE], &option.args[OPT_NONE] + strlen(option.args[OPT_NONE]), (int32_t)option.base[OPT_NONE]);
+			inout_data->state = (uint32_t)strtoull(option->args[OPT_NONE], &option->args[OPT_NONE] + strlen(option->args[OPT_NONE]), (int32_t)option->base[OPT_NONE]);
+			break;
+			
+		case OPT_UPPER_BOUND:
+			graph->upper_range = strtof(option->args[OPT_NONE], &option->args[OPT_NONE] + strlen(option->args[OPT_NONE]));
+			break;
+			
+		case OPT_LOWER_BOUND:
+			graph->lower_range = strtof(option->args[OPT_NONE], &option->args[OPT_NONE] + strlen(option->args[OPT_NONE]));
+			break;
 		
+		case OPT_NUM_SAMPLES:
+			graph->num_samples = 0xff & strtoull(option->args[OPT_NONE], &option->args[OPT_NONE] + strlen(option->args[OPT_NONE]), (int32_t)option->base[OPT_NONE]);
+			break;
+		
+		case OPT_NUM_STEPS:
+			graph->num_steps = 0xffff & strtoull(option->args[OPT_NONE], &option->args[OPT_NONE] + strlen(option->args[OPT_NONE]), (int32_t)option->base[OPT_NONE]);
+			break;
+			
+		case OPT_UNITS:
+			memcpy(graph->units, option->args[OPT_NONE], GRAPH_UNITS_MAX_LEN);
+			break;
+			
 		default:
 			// unreachable
 			break;
@@ -453,20 +497,17 @@ void set_func(yacl_inout_data_s* prev_inout_data, yacl_inout_data_s* inout_data)
 
 static void help_func(cb_lut_s* cb_lut)
 {
-	yacl_printf("\n\rYACL Help\n\n\r\t<action> <stream> <options>\n\n\r");
-	
-	yacl_printf("\toptions\n\t-d\tdata to pass to callback function\n\r");
-	yacl_printf("\t       \t-r\tspecific register values to pass to callback function\n\r");
-	yacl_printf("\t       \t-s\tstream address to pass to callback function (eg. i2c)\n\r");
-	yacl_printf("\t       \t-w\tconditional value to pass to callback function (sWitch-case)\n\r");
-	
-	yacl_printf("\noptions arguments are optional. the previously defined (or default values) may be passed by omitting options\n\r");
-	yacl_printf("\n\t<action> <stream>\n\r");
-	yacl_printf("\nthe above options are also accessible by using the 'set' action\n\r");
-	yacl_printf("\n\tset <options>\n\r");
-	yacl_printf("\nnote that the same data is passed to each callback stream, which is both advantageous and restrictive\n\r");
-	
-	yacl_printf("\n\tregistered callbacks (action, streams)\n\n\r");
+	yacl_printf("\n\rYACL Help\n\n\r\t<action> <stream> <options>\n\n\r"
+	            "\toptions\n\t-d\tdata to pass to callback function\n\r"
+	            "\t       \t-r\tspecific register values to pass to callback function\n\r"
+	            "\t       \t-s\tstream address to pass to callback function (eg. i2c)\n\r"
+	            "\t       \t-w\tconditional value to pass to callback function (sWitch-case)\n\r"
+	            "\noptions arguments are optional. the previously defined (or default values) may be passed by omitting options\n\r"
+	            "\n\t<action> <stream>\n\r"
+	            "\nthe above options are also accessible by using the 'set' action\n\r"
+	            "\n\tset <options>\n\r"
+	            "\nnote that the same data is passed to each callback stream, which is both advantageous and restrictive\n\r"
+	            "\n\tregistered callbacks (action, streams)\n\n\r");
 	
 	char* stream_names[NUM_STREAMS] = { "gpio", "i2c", "spi" };
 	char* action_names[NUM_USR_DEF_ACTIONS] = { "write", "read", "plot" };
@@ -489,18 +530,46 @@ static void clear_func(user_input_string_s* usr_input)
 {
 	empty_usr_str_bufr(usr_input);
 	vt100_welcome();
+	vt100_cursor_upward(1);
+}
+
+static void init_input_bufr(ring_buffer_s* input_bufr)
+{
+	input_bufr->head = 0;
+	input_bufr->tail = 0;
+	input_bufr->overrun = false;
+	
+	memset(input_bufr->bufr, 0, INPUT_DATA_LEN);
+}
+
+static void init_usr_input_bufr(user_input_string_s* usr_input)
+{
+	usr_input->index = 0;
+	usr_input->cursor = 0;
+	
+	memset(usr_input->bufr, 0, USER_INPUT_LEN);
 }
 
 static void init_graph(yacl_graph_s* usr_graph)
 {
 	if (usr_graph == NULL)
-		return;
-	
-	g_graph.units       = usr_graph->units;
-	g_graph.num_samples = usr_graph->num_samples;
-	g_graph.num_steps   = usr_graph->num_steps;
-	g_graph.upper_range = usr_graph->upper_range;
-	g_graph.lower_range = usr_graph->lower_range;
+	{
+		g_graph.upper_range = 1.0f;
+		g_graph.lower_range = 0.0f;
+		g_graph.num_steps   = 11;
+		g_graph.num_samples = 60;
+		g_graph.units[0] = 'V';
+	}
+	else
+	{
+		g_graph.num_samples = usr_graph->num_samples;
+		g_graph.num_steps   = usr_graph->num_steps;
+		g_graph.upper_range = usr_graph->upper_range;
+		g_graph.lower_range = usr_graph->lower_range;
+		
+		memcpy(g_graph.units, usr_graph->units, GRAPH_UNITS_MAX_LEN);
+		g_graph.units[GRAPH_UNITS_MAX_LEN] = '\0';  // must be null terminated
+	}
 }
 
 static yacl_error_e call_action_func(cb_lut_s* cb_lut, walk_stack_s* walk, user_input_string_s* usr_input, yacl_inout_data_s* inout_data, yacl_inout_data_s* prev_inout_data, bool use_prev_io_data)
@@ -527,9 +596,28 @@ static yacl_error_e call_action_func(cb_lut_s* cb_lut, walk_stack_s* walk, user_
 	case ACTION_PLOT:
 		if (cb_lut->funcs[action][stream] != NULL)
 		{
-			is_plot = true;
+			g_is_plot = true;
 			vt100_draw_graph(&g_graph);
+			
+			if (use_prev_io_data == true)
+			{
+				cb_lut->funcs[action][stream](inout_data);
+				set_func(prev_inout_data, inout_data);
+			}
+			else
+			{
+				cb_lut->funcs[action][stream](prev_inout_data);
+				set_func(inout_data, prev_inout_data);
+			}
+			
+			vt100_end_plot(&g_graph);
 		}
+		else
+		{
+			return YACL_UNKNOWN_CMD;
+		}
+		break;
+		
 	case ACTION_WRITE:
 	case ACTION_READ:
 		if (cb_lut->funcs[action][stream] != NULL)
@@ -568,18 +656,18 @@ static void strip_spaces(user_input_string_s* usr_input)
 	uint32_t bufr_str_len = strlen((char*)usr_input->bufr);
 	uint32_t num_spaces = 0;
 	
-	char prev_char = DELIM_SPACE;
+	char prev_char = ASCII_SP;
 	char curr_char = '\0';
 	
-	for (uint32_t i = 0; i < bufr_str_len && curr_char != DELIM_NEWLINE; ++i)
+	for (uint32_t i = 0; i < bufr_str_len && curr_char != ASCII_CR; ++i)
 	{
 		curr_char = usr_input->bufr[i];
 		
-		if (prev_char == DELIM_SPACE && curr_char == DELIM_SPACE)
+		if (prev_char == ASCII_SP && curr_char == ASCII_SP)
 		{
 			while (true)
 			{
-				if (usr_input->bufr[i + num_spaces] != DELIM_SPACE)
+				if (usr_input->bufr[i + num_spaces] != ASCII_SP)
 					break;
 
 				++num_spaces;
