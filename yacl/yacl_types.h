@@ -29,6 +29,7 @@ typedef enum Yacl_Streams {
 } stream_e;
 
 enum Option_Stack_Sizes {
+//    needed in yacl.h
 //    OPT_DATA_SIZE   = 32,
 //    OPT_REG_SIZE    = 32,
 	OPT_ADDR_SIZE   = 1,
@@ -55,18 +56,19 @@ enum Option_Stack_Offsets {
 };
 
 typedef enum Option_Stack_Indexes {
-    OPT_DATA        = 0,
-    OPT_REG         = 1,
-    OPT_ADDR        = 2,
-    OPT_STATE       = 3,
-    OPT_UPPER_BOUND = 4,
-    OPT_LOWER_BOUND = 5,
-    OPT_NUM_SAMPLES = 6,
-    OPT_NUM_STEPS   = 7,
-    OPT_UNITS       = 8,
+    OPT_DATA        = 0,    // -d
+    OPT_REG         = 1,    // -r
+    OPT_ADDR        = 2,    // -s
+    OPT_STATE       = 3,    // -w
+    OPT_UPPER_BOUND = 4,    // -u
+    OPT_LOWER_BOUND = 5,    // -l
+    OPT_NUM_SAMPLES = 6,    // -a
+    OPT_NUM_STEPS   = 7,    // -t
+    OPT_UNITS       = 8,    // -u
 
 	OPT_NONE        = 0,
     NUM_OPTIONS     = 9
+		
 } option_stack_index_e;
 
 typedef struct Option_Data_Stack {

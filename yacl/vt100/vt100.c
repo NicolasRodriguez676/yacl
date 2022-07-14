@@ -11,7 +11,7 @@ void vt100_welcome()
 {
 	vt100_erase_current_line();
 	vt100_clear_display();
-    yacl_printf("\x1b\x63YACL by Nick\n\n\rExplore peripherals connected to your MCU freely!\n\rType 'help' for more information or visit my GitHub\n\n\r>> ");
+    yacl_printf("\x1b\x63YACL by Nick\n\n\rExplore peripherals connected to your MCU freely!\n\rType 'help' for more information or visit my GitHub at NicolasRodriguez676\n\n\r>> ");
 }
 
 void vt100_yacl_view()

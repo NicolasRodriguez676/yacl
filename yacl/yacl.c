@@ -54,7 +54,7 @@ void yacl_init(yacl_usr_callbacks_s* usr_callbacks, yacl_graph_s* usr_graph)
 {
 	// assume user provides valid printf functions
 	yacl_printf = usr_callbacks->usr_print_funcs.usr_printf;
-	yacl_snprintf = usr_callbacks->usr_print_funcs.usr_snprintf;
+	yacl_snprintf = NULL; // usr_callbacks->usr_print_funcs.usr_snprintf;
 	
 	// initialize callbacks into protocol lookup table
 	// record non-null callbacks as valid
@@ -80,7 +80,7 @@ void yacl_wr_buf(char data)
 		return;
 	}
 	
-	if (g_input_bufr.head == (g_input_bufr.tail - 1))
+	if ((g_input_bufr.head & INPUT_BUFR_MASK) == ((g_input_bufr.tail & INPUT_BUFR_MASK) - 1))
 	{
 		g_input_bufr.overrun = true;
 		return;
@@ -107,6 +107,7 @@ yacl_error_e yacl_parse_cmd()
 		return error;
 	}
 	
+	// ignore enter 'spam'
 	if (g_usr_input.bufr[0] == ASCII_CR)
 	{
 		vt100_yacl_view();
@@ -149,6 +150,7 @@ yacl_error_e yacl_parse_cmd()
 
 yacl_error_e yacl_plot(float data)
 {
+	// yacl_wr_bufr can change `g_is_plot`
 	if (g_is_plot)
 	{
 		vt100_plot_graph(&g_graph, data);
@@ -307,7 +309,7 @@ static yacl_error_e preproc_input_bufr(ring_buffer_s* input_bufr, user_input_str
 			
 			// if cursor is not at index. writing to user string buffer will
 			// copy the user string buffer one byte to the right, from the cursor
-			// refresh yacl view and user string with inject character on the display
+			// refresh yacl view and user string with injected character on the display
 			if (usr_input->index > usr_input->cursor)
 			{
 				memmove(usr_input->bufr + usr_input->cursor, usr_input->bufr + (usr_input->cursor - 1), usr_input->index - (usr_input->cursor - 1));
@@ -319,12 +321,12 @@ static yacl_error_e preproc_input_bufr(ring_buffer_s* input_bufr, user_input_str
 				vt100_erase_current_line();
 				yacl_printf("\r>> %s", usr_input->bufr);
 				vt100_cursor_restore();
-				break;
 			}
-			
-			++usr_input->cursor;
-			usr_input->bufr[usr_input->index++] = data;
-			break;
+			else
+			{
+				++usr_input->cursor;
+				usr_input->bufr[usr_input->index++] = data;
+			}
 		}
 	}
 	return YACL_NO_CMD;
@@ -568,8 +570,9 @@ static void init_graph(yacl_graph_s* usr_graph)
 		g_graph.lower_range = usr_graph->lower_range;
 		
 		memcpy(g_graph.units, usr_graph->units, GRAPH_UNITS_MAX_LEN);
-		g_graph.units[GRAPH_UNITS_MAX_LEN] = '\0';  // must be null terminated
 	}
+	
+	g_graph.units[GRAPH_UNITS_MAX_LEN] = '\0';  // must be null terminated
 }
 
 static yacl_error_e call_action_func(cb_lut_s* cb_lut, walk_stack_s* walk, user_input_string_s* usr_input, yacl_inout_data_s* inout_data, yacl_inout_data_s* prev_inout_data, bool use_prev_io_data)
@@ -591,8 +594,6 @@ static yacl_error_e call_action_func(cb_lut_s* cb_lut, walk_stack_s* walk, user_
 		clear_func(usr_input);
 		break;
 	
-	// plot falls through to prevent redundant code. will still
-	// call the appropriate function
 	case ACTION_PLOT:
 		if (cb_lut->funcs[action][stream] != NULL)
 		{
@@ -648,7 +649,7 @@ static yacl_error_e call_action_func(cb_lut_s* cb_lut, walk_stack_s* walk, user_
 
 static void strip_spaces(user_input_string_s* usr_input)
 {
-	// this function make the parser grammar simpler but ultimately ensures the user
+	// this function makes the parser grammar simpler but ultimately ensures the user
 	// can navigate redundant spaces on display that directly represent the user string buffer
 	// other solutions are more complicated which require more memory, time and needlessly
 	// complicates this program, which does not even do that much
@@ -659,7 +660,7 @@ static void strip_spaces(user_input_string_s* usr_input)
 	char prev_char = ASCII_SP;
 	char curr_char = '\0';
 	
-	for (uint32_t i = 0; i < bufr_str_len && curr_char != ASCII_CR; ++i)
+	for (uint32_t i = 0; i < bufr_str_len && (curr_char != ASCII_CR); ++i)
 	{
 		curr_char = usr_input->bufr[i];
 		
@@ -672,6 +673,7 @@ static void strip_spaces(user_input_string_s* usr_input)
 
 				++num_spaces;
 			}
+			
 			memmove(usr_input->bufr + i, usr_input->bufr + i + num_spaces, bufr_str_len - i + num_spaces);
 			
 			i += num_spaces;
