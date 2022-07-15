@@ -137,16 +137,16 @@ Source of data, like a stream of data.
 4. All the parameters for plotting can be changed at runtime using the `set` action
 5. Plotting will start from the left and move towards the right. When the right most edge is met, plotting becomes significantly slower due to lack of advanced VT100 escape sequences that are support by PuTTY
 6. All actions can directly change the values within the `yacl_inout_data_s` data type. Except `clear`.
-7. YACL preserves the last write to `yacl_inout_s` such that the following is intended behavior. The previously written numerical one is passed to the `write gpio` callback function
+7. YACL preserves the last write to `yacl_inout_data_s` such that the following is intended behavior. The previously written numerical one is passed to the `write gpio` callback function
 ```
 >> set -d 1
 >> write gpio
 ```
-7. `yacl_inout_s` has an internal second data buffer meant for reading data from peripherals, which can even be shared using this approach
+7. `yacl_inout_data_s` has an internal second data buffer meant for reading data from peripherals, which can even be shared using this approach
 8. YACL does not display the output from calling callback functions. That is up to the user to implement as viewing data will be very different depending on the objectives of the end user.
 9. The `-w` option is a dedicated behavior control variable. To change the desired behavior of a callback function without the need to specify specifc entries within the `-d`
 or `-r` options. The same idea is used for the `-s` option, which is a dedicated peripheral address options
-10. There is a debug tool that I have used. To invoke it, press `backslash` once. I may expand this to inspect `yacl_inout_s` and to use a non-printable character
+10. There is a debug tool that I have used. To invoke it, press `backslash` once. I may expand this to inspect `yacl_inout_data_s` and to use a non-printable character
 #### YACL Parser
 
 To simplify development and make certain features feasible, I used [Ragel](https://www.colm.net/open-source/ragel/) to generate a state-machine parser that allows me to simply walk the text and pick up tokens with only worrying about the grammar.
