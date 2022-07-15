@@ -120,7 +120,28 @@ yacl_error_e yacl_parse_cmd()
 	
 	char* stack_args[OPT_STACK_SIZE];
 	uint32_t stack_base[OPT_STACK_SIZE];
-	option_data_stack_s option_stack[NUM_OPTIONS];
+	
+	option_data_stack_s opt_data    = { .args = NULL, .base = NULL, .idx = 0};
+	option_data_stack_s opt_reg     = { .args = NULL, .base = NULL, .idx = 0};
+	option_data_stack_s opt_addr    = { .args = NULL, .base = NULL, .idx = 0};
+	option_data_stack_s opt_state   = { .args = NULL, .base = NULL, .idx = 0};
+	option_data_stack_s opt_upper   = { .args = NULL, .base = NULL, .idx = 0};
+	option_data_stack_s opt_lower   = { .args = NULL, .base = NULL, .idx = 0};
+	option_data_stack_s opt_samples = { .args = NULL, .base = NULL, .idx = 0};
+	option_data_stack_s opt_steps   = { .args = NULL, .base = NULL, .idx = 0};
+	option_data_stack_s opt_units   = { .args = NULL, .base = NULL, .idx = 0};
+	
+	option_data_stack_s option_stack[NUM_OPTIONS] = {
+		opt_data,
+		opt_reg,
+		opt_addr,
+		opt_state,
+		opt_upper,
+		opt_lower,
+		opt_samples,
+		opt_steps,
+		opt_units
+	};
 	
 	walk_stack_s stack;
 	init_walk_stack(&stack, option_stack, stack_args, stack_base);
@@ -423,7 +444,6 @@ static void init_option_stack(option_data_stack_s* opt_stack, char** args, uint3
 		opt_stack->args[i] = NULL;
 		opt_stack->base[i] = 10;
 	}
-	opt_stack->idx = 0;
 }
 
 static bool get_stack_data(walk_stack_s* stack, yacl_inout_data_s* inout_data, yacl_graph_s* graph)
