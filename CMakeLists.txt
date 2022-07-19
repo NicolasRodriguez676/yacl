@@ -19,7 +19,7 @@ project(YACL
 
 add_subdirectory(yacl)
 
-if (${INSTALL-YACL})
+if (${INSTALL_YACL})
     include(cmake/InstallLibs.cmake)
     install_lib(YACL)
 
